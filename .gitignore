@@ -1,0 +1,23 @@
+# =========================
+# React Native
+# =========================
+BharatAppFrontend/node_modules/
+BharatAppFrontend/android/build/
+BharatAppFrontend/android/app/build/
+BharatAppFrontend/ios/build/
+
+# =========================
+# NestJS Backend
+# =========================
+bharat-app-backend/node_modules/
+bharat-app-backend/dist/
+bharat-app-backend/.env
+
+# =========================
+# Common
+# =========================
+.vscode/
+.idea/
+*.log
+.DS_Store
+Thumbs.db

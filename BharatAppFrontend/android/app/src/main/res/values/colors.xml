@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="brand_saffron">#FF7A00</color>
+    <color name="brand_saffron_dark">#E56D00</color>
+    <color name="brand_royal_blue">#0057FF</color>
+    <color name="splash_background">#FF7A00</color>
+</resources>
