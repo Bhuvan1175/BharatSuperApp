@@ -10,14 +10,21 @@ import { JwtStrategy } from './strategies/jwt.strategy';
   imports: [
     PrismaModule,
     RedisModule,
+
     JwtModule.register({
-      secret: process.env.JWT_SECRET!,
-      signOptions: {
-        expiresIn: 60 * 60 * 24 * 7,
-      },
+      secret: process.env.JWT_SECRET,
     }),
+
   ],
-  controllers: [AuthController],
-  providers: [AuthService, JwtStrategy],
+
+  controllers: [
+    AuthController
+  ],
+
+  providers: [
+    AuthService,
+    JwtStrategy
+  ],
+
 })
 export class AuthModule {}
