@@ -56,7 +56,7 @@ logout(
  @CurrentUser() user:any
 ){
 
- return this.authService.logout(user.id);
+ return this.authService.logout(user.userId);
 
 }
 
