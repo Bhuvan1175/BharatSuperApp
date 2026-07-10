@@ -8,21 +8,17 @@ datasource db {
 }
 
 model User {
-  id              String   @id @default(cuid())
-
-  phoneNumber     String   @unique
-  email           String?  @unique
+  id              String    @id @default(cuid())
+  phoneNumber     String    @unique
+  email           String?   @unique
   name            String?
-  username        String?  @unique
+  username        String?   @unique
   bio             String?
   profileImage    String?
-
-  isVerified      Boolean  @default(false)
-
+  isVerified      Boolean   @default(false)
   refreshToken    String?
   lastLoginAt     DateTime?
   lastLoginDevice String?
-
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 }

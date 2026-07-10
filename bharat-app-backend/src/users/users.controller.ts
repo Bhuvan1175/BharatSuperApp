@@ -15,10 +15,11 @@ export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
   @UseGuards(JwtAuthGuard)
-  @Get('profile')
-  getProfile(@CurrentUser() user: any) {
-    return this.usersService.getProfile(user.userId);
-  }
+@Get('profile')
+getProfile(@CurrentUser() user: any) {
+  console.log('Controller User:', user);
+  return this.usersService.getProfile(user.userId);
+}
 
   @UseGuards(JwtAuthGuard)
   @Patch('profile')
