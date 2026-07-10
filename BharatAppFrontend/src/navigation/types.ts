@@ -29,6 +29,7 @@ export type RootStackParamList = {
   Settings: undefined;
   Saved: undefined;
   EditProfile: undefined;
+  UserSearch: undefined;
 };
 
 /** Deep-link targets emitted by AI actions / quick actions. */

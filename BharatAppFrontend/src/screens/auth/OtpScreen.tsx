@@ -3,23 +3,26 @@ import {View, TextInput, Pressable, KeyboardAvoidingView, Platform} from 'react-
 import {NativeStackScreenProps} from '@react-navigation/native-stack';
 import {RootStackParamList} from '../../navigation/types';
 import {useTheme} from '../../context/ThemeContext';
-import {useAuth} from '../../context/AuthContext';
 import {useTranslation} from '../../hooks/useTranslation';
 import {useCountdown} from '../../hooks/useCountdown';
 import {APP_CONFIG} from '../../constants/config';
 import {Screen, AppText, Button, Header} from '../../components/common';
+import {authApi} from '../../api/auth.api';
+import {getApiErrorMessage} from '../../api/errors';
+import {useAuthStore} from '../../store/authStore';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Otp'>;
 
 const OtpScreen: React.FC<Props> = ({navigation, route}) => {
   const {theme} = useTheme();
   const {t} = useTranslation();
-  const {signIn} = useAuth();
+  const setSession = useAuthStore(s => s.setSession);
   const {phone} = route.params;
   const len = APP_CONFIG.otpLength;
   const [digits, setDigits] = useState<string[]>(Array(len).fill(''));
   const [attempts, setAttempts] = useState(0);
   const [error, setError] = useState<string | undefined>();
+  const [loading, setLoading] = useState(false);
   const inputs = useRef<(TextInput | null)[]>([]);
   const {remaining, running, start} = useCountdown(APP_CONFIG.otpResendSeconds);
 
@@ -44,16 +47,39 @@ const OtpScreen: React.FC<Props> = ({navigation, route}) => {
     if (key === 'Backspace' && !digits[i] && i > 0) inputs.current[i - 1]?.focus();
   };
 
-  const verify = () => {
-    // Demo: any 6-digit code except "000000" is accepted.
-    if (code === '000000') {
+  const verify = async () => {
+    if (!complete) return;
+    setLoading(true);
+    setError(undefined);
+    try {
+      const res = await authApi.verifyOtp(phone, code);
+      // Persist tokens + user. This flips isAuthenticated = true, which makes
+      // RootNavigator swap to the authenticated stack automatically — no
+      // manual navigation needed here.
+      await setSession(res.user, res.accessToken, res.refreshToken);
+    } catch (e) {
       const n = attempts + 1;
       setAttempts(n);
-      setError(n >= APP_CONFIG.maxOtpAttempts ? 'Too many attempts. Please try again later.' : 'Incorrect OTP. Try again.');
-      return;
+      setError(
+        n >= APP_CONFIG.maxOtpAttempts
+          ? 'Too many attempts. Please try again later.'
+          : getApiErrorMessage(e, 'Incorrect OTP. Try again.'),
+      );
+    } finally {
+      setLoading(false);
     }
-    signIn(phone);
-    navigation.replace('Permissions');
+  };
+
+  const onResend = async () => {
+    setError(undefined);
+    try {
+      await authApi.sendOtp(phone);
+      setDigits(Array(len).fill(''));
+      setAttempts(0);
+      start();
+    } catch (e) {
+      setError(getApiErrorMessage(e));
+    }
   };
 
   return (
@@ -80,6 +106,7 @@ const OtpScreen: React.FC<Props> = ({navigation, route}) => {
               keyboardType="number-pad"
               maxLength={1}
               autoFocus={i === 0}
+              editable={!loading}
               style={{
                 width: 48,
                 height: 58,
@@ -108,7 +135,7 @@ const OtpScreen: React.FC<Props> = ({navigation, route}) => {
               {t.auth.resendIn} 00:{remaining.toString().padStart(2, '0')}
             </AppText>
           ) : (
-            <Pressable onPress={start} hitSlop={8}>
+            <Pressable onPress={onResend} hitSlop={8}>
               <AppText variant="label" color={theme.colors.secondary}>
                 {t.auth.resend}
               </AppText>
@@ -116,9 +143,15 @@ const OtpScreen: React.FC<Props> = ({navigation, route}) => {
           )}
         </View>
 
-        <Button label={t.auth.verify} onPress={verify} disabled={!complete || attempts >= APP_CONFIG.maxOtpAttempts} style={{marginTop: theme.spacing.xxl}} />
+        <Button
+          label={t.auth.verify}
+          onPress={verify}
+          loading={loading}
+          disabled={!complete || loading || attempts >= APP_CONFIG.maxOtpAttempts}
+          style={{marginTop: theme.spacing.xxl}}
+        />
         <AppText variant="caption" muted center style={{marginTop: theme.spacing.lg}}>
-          Demo build: enter any 6 digits to continue.
+          Enter the 6-digit code sent to your number.
         </AppText>
       </KeyboardAvoidingView>
     </Screen>

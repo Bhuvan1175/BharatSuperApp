@@ -8,12 +8,14 @@ import React from 'react';
 import {StatusBar} from 'react-native';
 import {GestureHandlerRootView} from 'react-native-gesture-handler';
 import {SafeAreaProvider} from 'react-native-safe-area-context';
+import {QueryClientProvider} from '@tanstack/react-query';
 
 import {ThemeProvider, useTheme} from '@context/ThemeContext';
 import {LanguageProvider} from '@context/LanguageContext';
 import {AuthProvider} from '@context/AuthContext';
 import {AppDataProvider} from '@context/AppDataContext';
 import RootNavigator from '@navigation/RootNavigator';
+import {queryClient} from '@/api/queryClient';
 
 /**
  * Renders the status bar with colors bound to the active theme so it stays
@@ -33,18 +35,20 @@ const ThemedStatusBar: React.FC = () => {
 const App: React.FC = () => {
   return (
     <GestureHandlerRootView style={{flex: 1}}>
-      <SafeAreaProvider>
-        <ThemeProvider>
-          <LanguageProvider>
-            <AuthProvider>
-              <AppDataProvider>
-                <ThemedStatusBar />
-                <RootNavigator />
-              </AppDataProvider>
-            </AuthProvider>
-          </LanguageProvider>
-        </ThemeProvider>
-      </SafeAreaProvider>
+      <QueryClientProvider client={queryClient}>
+        <SafeAreaProvider>
+          <ThemeProvider>
+            <LanguageProvider>
+              <AuthProvider>
+                <AppDataProvider>
+                  <ThemedStatusBar />
+                  <RootNavigator />
+                </AppDataProvider>
+              </AuthProvider>
+            </LanguageProvider>
+          </ThemeProvider>
+        </SafeAreaProvider>
+      </QueryClientProvider>
     </GestureHandlerRootView>
   );
 };

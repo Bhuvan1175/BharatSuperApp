@@ -6,13 +6,13 @@ import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {RootStackParamList} from '../../navigation/types';
 import {navigateTo} from '../../navigation/navigationRef';
 import {useTheme} from '../../context/ThemeContext';
-import {useAuth} from '../../context/AuthContext';
 import {useAppData} from '../../context/AppDataContext';
 import {useTranslation} from '../../hooks/useTranslation';
 import {useRotatingText} from '../../hooks/useRotatingText';
 import {QUICK_ACTIONS} from '../../constants/quickActions';
 import {alertsService} from '../../services/alertsService';
 import {LocalAlert} from '../../types';
+import {useAuthStore} from '../../store/authStore';
 import {
   AppText,
   SearchBar,
@@ -29,11 +29,14 @@ type Nav = NativeStackNavigationProp<RootStackParamList>;
 const HomeScreen: React.FC = () => {
   const {theme} = useTheme();
   const {t} = useTranslation();
-  const {user} = useAuth();
+  const user = useAuthStore(s => s.user);
   const {recents, addRecent} = useAppData();
   const navigation = useNavigation<Nav>();
   const placeholder = useRotatingText(t.home.searchPlaceholders);
   const [alerts, setAlerts] = useState<LocalAlert[]>([]);
+
+  // Prefer first name, then username, then a friendly fallback.
+  const greetingName = user?.name?.split(' ')[0] ?? user?.username ?? 'there';
 
   useEffect(() => {
     alertsService.getAlerts().then(setAlerts);
@@ -60,16 +63,16 @@ const HomeScreen: React.FC = () => {
             <AppText variant="body" muted numberOfLines={1}>
               {t.home.greeting}, 🙏
             </AppText>
-            <AppText variant="h2" numberOfLines={1}>{user?.name?.split(' ')[0] ?? 'there'}</AppText>
+            <AppText variant="h2" numberOfLines={1}>{greetingName}</AppText>
             <View style={{flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2}}>
-              <Icon name="map-pin" size={13} color={theme.colors.primary} />
+              <Icon name={user?.username ? 'at-sign' : 'map-pin'} size={13} color={theme.colors.primary} />
               <AppText variant="caption" muted numberOfLines={1} style={{flexShrink: 1}}>
-                {user?.location ?? 'Set your location'}
+                {user?.username ?? 'Complete your profile'}
               </AppText>
             </View>
           </View>
           <Pressable onPress={() => navigateTo('ProfileTab')}>
-            <Avatar name={user?.name ?? 'User'} uri={user?.avatar} size={46} />
+            <Avatar name={user?.name ?? 'User'} uri={user?.profileImage ?? undefined} size={46} />
           </Pressable>
         </View>
 
