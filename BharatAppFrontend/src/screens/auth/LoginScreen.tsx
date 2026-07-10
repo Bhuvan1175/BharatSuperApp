@@ -5,6 +5,8 @@ import {RootStackParamList} from '../../navigation/types';
 import {useTheme} from '../../context/ThemeContext';
 import {useTranslation} from '../../hooks/useTranslation';
 import {Screen, AppText, Button, Input, Icon} from '../../components/common';
+import {authApi} from '../../api/auth.api';
+import {getApiErrorMessage} from '../../api/errors';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Login'>;
 
@@ -13,16 +15,25 @@ const LoginScreen: React.FC<Props> = ({navigation}) => {
   const {t} = useTranslation();
   const [phone, setPhone] = useState('');
   const [error, setError] = useState<string | undefined>();
+  const [loading, setLoading] = useState(false);
 
   const valid = /^[6-9]\d{9}$/.test(phone);
 
-  const onSend = () => {
+  const onSend = async () => {
     if (!valid) {
       setError('Enter a valid 10-digit Indian mobile number.');
       return;
     }
     setError(undefined);
-    navigation.navigate('Otp', {phone});
+    setLoading(true);
+    try {
+      await authApi.sendOtp(phone);
+      navigation.navigate('Otp', {phone});
+    } catch (e) {
+      setError(getApiErrorMessage(e));
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -72,7 +83,14 @@ const LoginScreen: React.FC<Props> = ({navigation}) => {
             />
           </View>
 
-          <Button label={t.auth.sendOtp} onPress={onSend} iconRight="arrow-right" style={{marginTop: theme.spacing.xl}} disabled={!valid} />
+          <Button
+            label={t.auth.sendOtp}
+            onPress={onSend}
+            iconRight="arrow-right"
+            style={{marginTop: theme.spacing.xl}}
+            disabled={!valid || loading}
+            loading={loading}
+          />
 
           <AppText variant="caption" muted center style={{marginTop: theme.spacing.xxl}}>
             By continuing you agree to our Terms & Privacy Policy. Your data is protected per India's DPDP Act.

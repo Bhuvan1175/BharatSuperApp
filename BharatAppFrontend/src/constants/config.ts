@@ -20,4 +20,7 @@ export const STORAGE_KEYS = {
   savedItems: '@bsa/saved_items',
   aiPersonality: '@bsa/ai_personality',
   notifications: '@bsa/notifications',
+  // --- Auth tokens (added for backend integration) ---
+  accessToken: '@bsa/access_token',
+  refreshToken: '@bsa/refresh_token',
 } as const;
