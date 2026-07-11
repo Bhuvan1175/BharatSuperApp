@@ -1,13 +1,15 @@
-import { IsEmail, IsOptional, IsString, Length, Matches, MaxLength } from 'class-validator';
+import { IsOptional, IsString, Length, Matches, MaxLength } from 'class-validator';
 
 export class UpdateProfileDto {
   @IsOptional()
   @IsString()
   name?: string;
 
-  @IsOptional()
-  @IsEmail()
-  email?: string;
+  // NOTE: `email` is intentionally NOT updatable here.
+  // It is set once during OTP signup (verifyOtp) and must not be changed
+  // via the profile update endpoint. Because main.ts uses
+  // ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }),
+  // any request that includes `email` is rejected with a 400.
 
   @IsOptional()
   @IsString()
