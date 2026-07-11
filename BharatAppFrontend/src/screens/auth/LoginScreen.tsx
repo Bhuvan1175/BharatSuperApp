@@ -13,22 +13,24 @@ type Props = NativeStackScreenProps<RootStackParamList, 'Login'>;
 const LoginScreen: React.FC<Props> = ({navigation}) => {
   const {theme} = useTheme();
   const {t} = useTranslation();
-  const [phone, setPhone] = useState('');
+  const [email, setEmail] = useState('');
   const [error, setError] = useState<string | undefined>();
   const [loading, setLoading] = useState(false);
 
-  const valid = /^[6-9]\d{9}$/.test(phone);
+  // Basic email format check (final validation happens on the backend via @IsEmail()).
+  const valid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
 
   const onSend = async () => {
     if (!valid) {
-      setError('Enter a valid 10-digit Indian mobile number.');
+      setError('Enter a valid email address.');
       return;
     }
     setError(undefined);
     setLoading(true);
     try {
-      await authApi.sendOtp(phone);
-      navigation.navigate('Otp', {phone});
+      const cleanEmail = email.trim().toLowerCase();
+      await authApi.sendOtp(cleanEmail);
+      navigation.navigate('Otp', {email: cleanEmail});
     } catch (e) {
       setError(getApiErrorMessage(e));
     } finally {
@@ -50,38 +52,23 @@ const LoginScreen: React.FC<Props> = ({navigation}) => {
               justifyContent: 'center',
               marginBottom: theme.spacing.xl,
             }}>
-            <Icon name="smartphone" size={30} color={theme.colors.textInverse} />
+            <Icon name="mail" size={30} color={theme.colors.textInverse} />
           </View>
           <AppText variant="h1">{t.auth.loginTitle}</AppText>
           <AppText variant="body" muted style={{marginTop: theme.spacing.sm, marginBottom: theme.spacing.xxl}}>
             {t.auth.loginSubtitle}
           </AppText>
 
-          <View style={{flexDirection: 'row', gap: theme.spacing.md, alignItems: 'flex-start'}}>
-            <View
-              style={{
-                height: 50,
-                paddingHorizontal: theme.spacing.md,
-                borderRadius: theme.radius.md,
-                borderWidth: 1.5,
-                borderColor: theme.colors.border,
-                backgroundColor: theme.colors.surface,
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}>
-              <AppText variant="bodyStrong">🇮🇳 +91</AppText>
-            </View>
-            <Input
-              containerStyle={{flex: 1}}
-              placeholder={t.auth.phonePlaceholder}
-              keyboardType="phone-pad"
-              maxLength={10}
-              value={phone}
-              onChangeText={txt => setPhone(txt.replace(/[^0-9]/g, ''))}
-              error={error}
-              icon="phone"
-            />
-          </View>
+          <Input
+            placeholder={t.auth.emailPlaceholder}
+            keyboardType="email-address"
+            autoCapitalize="none"
+            autoCorrect={false}
+            value={email}
+            onChangeText={txt => setEmail(txt)}
+            error={error}
+            icon="mail"
+          />
 
           <Button
             label={t.auth.sendOtp}

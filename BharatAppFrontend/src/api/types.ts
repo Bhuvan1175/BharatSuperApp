@@ -2,7 +2,7 @@
 
 export interface ApiUser {
   id: string;
-  phoneNumber: string;
+  phoneNumber: string | null;
   email: string | null;
   name: string | null;
   username: string | null;
@@ -17,7 +17,7 @@ export interface ApiUser {
 export interface SendOtpResponse {
   success: boolean;
   message: string;
-  phoneNumber: string;
+  email: string;
 }
 
 export interface VerifyOtpResponse {

@@ -8,19 +8,19 @@ import {
 
 /** Auth endpoints (POST /api/auth/*). */
 export const authApi = {
-  sendOtp: async (phoneNumber: string): Promise<SendOtpResponse> => {
+  sendOtp: async (email: string): Promise<SendOtpResponse> => {
     const {data} = await apiClient.post<SendOtpResponse>('/auth/send-otp', {
-      phoneNumber,
+      email,
     });
     return data;
   },
 
   verifyOtp: async (
-    phoneNumber: string,
+    email: string,
     otp: string,
   ): Promise<VerifyOtpResponse> => {
     const {data} = await apiClient.post<VerifyOtpResponse>('/auth/verify-otp', {
-      phoneNumber,
+      email,
       otp,
     });
     return data;

@@ -3,6 +3,7 @@ import { SendOtpDto } from './dto/send-otp.dto';
 import { VerifyOtpDto } from './dto/verify-otp.dto';
 import { RedisService } from '../redis/redis.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { EmailService } from '../email/email.service';
 import { JwtService } from '@nestjs/jwt';
 
 @Injectable()
@@ -11,6 +12,7 @@ export class AuthService {
   constructor(
     private readonly redisService: RedisService,
     private readonly prisma: PrismaService,
+    private readonly emailService: EmailService,
     private readonly jwtService: JwtService,
   ) {}
 
@@ -23,21 +25,23 @@ export class AuthService {
 
 
     await this.redisService.set(
-      `otp:${sendOtpDto.phoneNumber}`,
+      `otp:${sendOtpDto.email}`,
       otp,
       300,
     );
 
 
-    console.log(
-      `📱 OTP for ${sendOtpDto.phoneNumber}: ${otp}`
+    // Deliver the OTP by email. The OTP is never logged or returned.
+    await this.emailService.sendOtpEmail(
+      sendOtpDto.email,
+      otp,
     );
 
 
     return {
       success:true,
       message:'OTP sent successfully',
-      phoneNumber:sendOtpDto.phoneNumber,
+      email:sendOtpDto.email,
     };
 
   }
@@ -50,7 +54,7 @@ export class AuthService {
 
 
     const savedOtp = await this.redisService.get(
-      `otp:${verifyOtpDto.phoneNumber}`,
+      `otp:${verifyOtpDto.email}`,
     );
 
 
@@ -73,7 +77,7 @@ export class AuthService {
 
 
     await this.redisService.del(
-      `otp:${verifyOtpDto.phoneNumber}`
+      `otp:${verifyOtpDto.email}`
     );
 
 
@@ -81,7 +85,7 @@ export class AuthService {
     let user = await this.prisma.user.findUnique({
 
       where:{
-        phoneNumber:verifyOtpDto.phoneNumber
+        email:verifyOtpDto.email
       }
 
     });
@@ -93,8 +97,8 @@ export class AuthService {
       user = await this.prisma.user.create({
 
         data:{
-          phoneNumber:
-          verifyOtpDto.phoneNumber,
+          email:
+          verifyOtpDto.email,
 
           isVerified:true,
         }
@@ -112,7 +116,7 @@ export class AuthService {
 
       {
         sub:user.id,
-        phoneNumber:user.phoneNumber,
+        email:user.email,
       },
 
       {
@@ -278,7 +282,7 @@ export class AuthService {
 
       {
         sub:user.id,
-        phoneNumber:user.phoneNumber,
+        email:user.email,
       },
 
       {

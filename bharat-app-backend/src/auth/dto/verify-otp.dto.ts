@@ -1,8 +1,8 @@
-import { IsMobilePhone, IsString, Length } from 'class-validator';
+import { IsEmail, IsString, Length } from 'class-validator';
 
 export class VerifyOtpDto {
-  @IsMobilePhone('en-IN')
-  phoneNumber!: string;
+  @IsEmail()
+  email!: string;
 
   @IsString()
   @Length(6, 6)

@@ -17,7 +17,7 @@ const OtpScreen: React.FC<Props> = ({navigation, route}) => {
   const {theme} = useTheme();
   const {t} = useTranslation();
   const setSession = useAuthStore(s => s.setSession);
-  const {phone} = route.params;
+  const {email} = route.params;
   const len = APP_CONFIG.otpLength;
   const [digits, setDigits] = useState<string[]>(Array(len).fill(''));
   const [attempts, setAttempts] = useState(0);
@@ -52,7 +52,7 @@ const OtpScreen: React.FC<Props> = ({navigation, route}) => {
     setLoading(true);
     setError(undefined);
     try {
-      const res = await authApi.verifyOtp(phone, code);
+      const res = await authApi.verifyOtp(email, code);
       // Persist tokens + user. This flips isAuthenticated = true, which makes
       // RootNavigator swap to the authenticated stack automatically — no
       // manual navigation needed here.
@@ -73,7 +73,7 @@ const OtpScreen: React.FC<Props> = ({navigation, route}) => {
   const onResend = async () => {
     setError(undefined);
     try {
-      await authApi.sendOtp(phone);
+      await authApi.sendOtp(email);
       setDigits(Array(len).fill(''));
       setAttempts(0);
       start();
@@ -90,7 +90,7 @@ const OtpScreen: React.FC<Props> = ({navigation, route}) => {
           {t.auth.otpTitle}
         </AppText>
         <AppText variant="body" muted style={{marginTop: theme.spacing.sm}}>
-          {t.auth.otpSubtitle} +91 {phone}
+          {t.auth.otpSubtitle} {email}
         </AppText>
 
         <View style={{flexDirection: 'row', justifyContent: 'space-between', marginTop: theme.spacing.xxl}}>
@@ -151,7 +151,7 @@ const OtpScreen: React.FC<Props> = ({navigation, route}) => {
           style={{marginTop: theme.spacing.xxl}}
         />
         <AppText variant="caption" muted center style={{marginTop: theme.spacing.lg}}>
-          Enter the 6-digit code sent to your number.
+          Enter the 6-digit code sent to your email.
         </AppText>
       </KeyboardAvoidingView>
     </Screen>
