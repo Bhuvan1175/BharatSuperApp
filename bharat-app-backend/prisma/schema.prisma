@@ -22,4 +22,46 @@ model User {
   lastLoginDevice      String?
   createdAt            DateTime  @default(now())
   updatedAt            DateTime  @updatedAt
+
+  // ---- RBAC (added; all optional/defaulted → additive, non-breaking) ----
+  // Whether the account is active. Deactivating a department user blocks login
+  // and all requests immediately.
+  isActive     Boolean     @default(true)
+  // The user's role (Citizen / Super Admin / a department manager). Optional so
+  // existing rows keep working; verify-otp assigns PUBLIC_USER to new citizens.
+  roleId       String?
+  role         Role?       @relation(fields: [roleId], references: [id])
+  // The department a manager belongs to (null for citizens / super-admin).
+  departmentId String?
+  department   Department? @relation(fields: [departmentId], references: [id])
+
+  @@index([roleId])
+  @@index([departmentId])
+}
+
+/// A role a user can hold. Data-driven so a Super Admin can create new roles at
+/// runtime. `permissions` are strings like "medicine:manage"; "*" = all.
+model Role {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  label       String?
+  permissions String[] @default([])
+  // System roles are seeded and must not be deleted via the admin API.
+  isSystem    Boolean  @default(false)
+  users       User[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+/// A department that owns one app module. `moduleKey` (e.g. "medicine") ties the
+/// department to a module and matches the frontend module keys.
+model Department {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  label     String?
+  moduleKey String   @unique
+  isActive  Boolean  @default(true)
+  users     User[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }

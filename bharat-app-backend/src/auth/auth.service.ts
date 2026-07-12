@@ -82,11 +82,17 @@ export class AuthService {
 
 
 
+    // Load the user WITH their role + department so the JWT can carry them.
     let user = await this.prisma.user.findUnique({
 
       where:{
         email:verifyOtpDto.email
-      }
+      },
+
+      include:{
+        role:true,
+        department:true,
+      },
 
     });
 
@@ -94,6 +100,7 @@ export class AuthService {
 
     if(!user){
 
+      // Brand-new citizen → create with the default PUBLIC_USER role.
       user = await this.prisma.user.create({
 
         data:{
@@ -101,7 +108,36 @@ export class AuthService {
           verifyOtpDto.email,
 
           isVerified:true,
-        }
+
+          role:{
+            connect:{ name:'PUBLIC_USER' }
+          },
+        },
+
+        include:{
+          role:true,
+          department:true,
+        },
+
+      });
+
+    }
+
+    else if(!user.roleId){
+
+      // Existing user created before RBAC → backfill the default role.
+      user = await this.prisma.user.update({
+
+        where:{ id:user.id },
+
+        data:{
+          role:{ connect:{ name:'PUBLIC_USER' } }
+        },
+
+        include:{
+          role:true,
+          department:true,
+        },
 
       });
 
@@ -109,7 +145,18 @@ export class AuthService {
 
 
 
-    // ACCESS TOKEN
+    // Deactivated accounts (e.g. a removed department user) cannot log in.
+    if(!user.isActive){
+
+      throw new UnauthorizedException(
+        'Account is deactivated'
+      );
+
+    }
+
+
+
+    // ACCESS TOKEN — now carries role + department (nulls for a plain citizen).
 
     const accessToken =
     await this.jwtService.signAsync(
@@ -117,6 +164,8 @@ export class AuthService {
       {
         sub:user.id,
         email:user.email,
+        role:user.role?.name ?? null,
+        department:user.department?.name ?? null,
       },
 
       {
@@ -244,7 +293,12 @@ export class AuthService {
 
       where:{
         id:payload.sub
-      }
+      },
+
+      include:{
+        role:true,
+        department:true,
+      },
 
     });
 
@@ -254,6 +308,17 @@ export class AuthService {
 
       throw new UnauthorizedException(
         'User not found'
+      );
+
+    }
+
+
+
+    // Deactivated accounts cannot refresh either.
+    if(!user.isActive){
+
+      throw new UnauthorizedException(
+        'Account is deactivated'
       );
 
     }
@@ -275,7 +340,7 @@ export class AuthService {
 
 
 
-    // NEW ACCESS TOKEN
+    // NEW ACCESS TOKEN — refreshes role + department too, so changes propagate.
 
     const accessToken =
     await this.jwtService.signAsync(
@@ -283,6 +348,8 @@ export class AuthService {
       {
         sub:user.id,
         email:user.email,
+        role:user.role?.name ?? null,
+        department:user.department?.name ?? null,
       },
 
       {

@@ -9,6 +9,11 @@ import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { RedisModule } from './redis/redis.module';
 import { EmailModule } from './email/email.module';
+import { RoleModule } from './role/role.module';
+import { DepartmentModule } from './department/department.module';
+import { AdminModule } from './admin/admin.module';
+import { MedicineModule } from './modules/medicine/medicine.module';
+import { WaterModule } from './modules/water/water.module';
 
 @Module({
   imports: [
@@ -20,6 +25,12 @@ import { EmailModule } from './email/email.module';
     UsersModule,
     RedisModule,
     EmailModule,
+    RoleModule,
+    DepartmentModule,
+    AdminModule,
+    // Example module APIs demonstrating role-gated authorization.
+    MedicineModule,
+    WaterModule,
   ],
   controllers: [AppController],
   providers: [AppService],

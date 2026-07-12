@@ -17,15 +17,18 @@ export class UsersService {
   ) {}
 
   async getProfile(userId: string) {
-    console.log('Service UserId:', userId);
-
+    // Include role + department so the frontend (and app bootstrap) always
+    // knows which dashboard to show. Without this, a manager would be treated
+    // as a plain citizen after an app restart.
     const user = await this.prisma.user.findUnique({
       where: {
         id: userId,
       },
+      include: {
+        role: true,
+        department: true,
+      },
     });
-
-    console.log('DB User:', user);
 
     return user;
   }
