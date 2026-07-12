@@ -1,6 +1,9 @@
 import React from 'react';
-import {View, ScrollView} from 'react-native';
+import {View, ScrollView, Pressable} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
+import {useNavigation} from '@react-navigation/native';
+import {NativeStackNavigationProp} from '@react-navigation/native-stack';
+import {RootStackParamList} from '../../navigation/types';
 import {MODULES, ModuleKey} from '@/rbac';
 import {useAuthStore} from '@/store/authStore';
 import {useTheme} from '@context/ThemeContext';
@@ -9,33 +12,21 @@ import RoleGuard from '@navigation/RoleGuard';
 import StatisticsCard from './StatisticsCard';
 import QuickActionCard from './QuickActionCard';
 import AccountButton from './AccountButton';
+import {useListingStats, useListings} from '../../hooks/useListings';
 
 /**
  * DepartmentDashboard — ONE generic dashboard for every department manager.
- * It reads the department straight from the auth store (backend-provided), so
- * it renders correctly for any department — including ones the app didn't know
- * about at compile time. For known modules it uses the MODULES catalogue for
- * icon/colour; for unknown ones it falls back to sensible defaults.
- *
- * Placeholder only (no data APIs yet). The `module` prop is accepted but unused
- * (kept so the old per-department wrapper screens still compile).
+ * It reads the department from the auth store (backend-provided) and now drives
+ * the four management blocks + live overview stats + recent activity from the
+ * generic Listing APIs. Works for ANY department/module, including ones created
+ * at runtime by the super admin.
  */
 
-const STATS: {key: string; label: string}[] = [
-  {key: 'total', label: 'Total Listings'},
-  {key: 'active', label: 'Active'},
-  {key: 'pending', label: 'Pending'},
-];
-
-const MANAGE_ACTIONS: {key: string; label: string; icon: string}[] = [
-  {key: 'add', label: 'Add Listing', icon: 'plus-circle'},
-  {key: 'manage', label: 'Manage Entries', icon: 'edit-3'},
-  {key: 'reports', label: 'Reports', icon: 'bar-chart-2'},
-  {key: 'settings', label: 'Module Settings', icon: 'sliders'},
-];
+type Nav = NativeStackNavigationProp<RootStackParamList>;
 
 const DepartmentDashboard: React.FC<{module?: string}> = () => {
   const {theme} = useTheme();
+  const navigation = useNavigation<Nav>();
   const department = useAuthStore(s => s.department);
   const role = useAuthStore(s => s.role);
 
@@ -44,6 +35,49 @@ const DepartmentDashboard: React.FC<{module?: string}> = () => {
   const color = meta?.color ?? theme.colors.primary;
   const icon = meta?.icon ?? 'grid';
   const title = department?.label ?? department?.name ?? 'Department';
+
+  const {data: stats} = useListingStats(moduleKey);
+  const {data: recent} = useListings(moduleKey ? {moduleKey} : undefined);
+
+  const statTiles = [
+    {key: 'total', label: 'Total Entries', value: stats?.total},
+    {key: 'active', label: 'Active', value: stats?.active},
+    {key: 'archived', label: 'Archived', value: stats?.archived},
+  ];
+
+  const actions: {
+    key: string;
+    label: string;
+    icon: string;
+    onPress: () => void;
+  }[] = [
+    {
+      key: 'add',
+      label: 'Add Entry',
+      icon: 'plus-circle',
+      onPress: () => navigation.navigate('DeptAddListing'),
+    },
+    {
+      key: 'manage',
+      label: 'Manage Entries',
+      icon: 'edit-3',
+      onPress: () => navigation.navigate('DeptManageEntries'),
+    },
+    {
+      key: 'reports',
+      label: 'Reports',
+      icon: 'bar-chart-2',
+      onPress: () => navigation.navigate('DeptReports'),
+    },
+    {
+      key: 'settings',
+      label: 'Areas & Settings',
+      icon: 'map-pin',
+      onPress: () => navigation.navigate('DeptLocalities'),
+    },
+  ];
+
+  const recentTop = (recent ?? []).slice(0, 5);
 
   return (
     <RoleGuard moduleKey={moduleKey} requireManage>
@@ -108,11 +142,11 @@ const DepartmentDashboard: React.FC<{module?: string}> = () => {
           <View style={{marginTop: theme.spacing.xl}}>
             <SectionHeader title="Overview" />
             <View style={{flexDirection: 'row', gap: theme.spacing.md}}>
-              {STATS.map(s => (
+              {statTiles.map(s => (
                 <StatisticsCard
                   key={s.key}
                   label={s.label}
-                  value="—"
+                  value={s.value ?? '—'}
                   style={{flex: 1}}
                 />
               ))}
@@ -128,13 +162,13 @@ const DepartmentDashboard: React.FC<{module?: string}> = () => {
                 flexWrap: 'wrap',
                 justifyContent: 'space-between',
               }}>
-              {MANAGE_ACTIONS.map(a => (
+              {actions.map(a => (
                 <QuickActionCard
                   key={a.key}
                   label={a.label}
                   icon={a.icon}
                   color={color}
-                  hint="Coming soon"
+                  onPress={a.onPress}
                   style={{width: '48%', marginBottom: theme.spacing.md}}
                 />
               ))}
@@ -143,14 +177,55 @@ const DepartmentDashboard: React.FC<{module?: string}> = () => {
 
           {/* ---- Recent activity ---- */}
           <View style={{marginTop: theme.spacing.sm}}>
-            <SectionHeader title="Recent Activity" />
-            <Card>
-              <EmptyState
-                icon="inbox"
-                title="No activity yet"
-                subtitle="Data appears here once the backend module APIs are connected."
-              />
-            </Card>
+            <SectionHeader
+              title="Recent Activity"
+              actionLabel={recentTop.length ? 'See all' : undefined}
+              onAction={
+                recentTop.length
+                  ? () => navigation.navigate('DeptManageEntries')
+                  : undefined
+              }
+            />
+            {!recentTop.length ? (
+              <Card>
+                <EmptyState
+                  icon="inbox"
+                  title="No activity yet"
+                  subtitle="Add your first entry from the Add Entry block above."
+                />
+              </Card>
+            ) : (
+              recentTop.map(item => (
+                <Pressable
+                  key={item.id}
+                  onPress={() =>
+                    navigation.navigate('DeptAddListing', {listingId: item.id})
+                  }>
+                  <Card
+                    style={{
+                      marginBottom: theme.spacing.sm,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: theme.spacing.md,
+                    }}>
+                    <View style={{flex: 1}}>
+                      <AppText variant="title" numberOfLines={1}>
+                        {item.title}
+                      </AppText>
+                      <AppText variant="caption" muted numberOfLines={1}>
+                        {item.locality?.name ?? item.city?.name ?? 'All areas'} ·{' '}
+                        {item.status}
+                      </AppText>
+                    </View>
+                    <Icon
+                      name="chevron-right"
+                      size={18}
+                      color={theme.colors.textMuted}
+                    />
+                  </Card>
+                </Pressable>
+              ))
+            )}
           </View>
         </ScrollView>
       </SafeAreaView>

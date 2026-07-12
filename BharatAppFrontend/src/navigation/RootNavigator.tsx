@@ -39,9 +39,16 @@ import {
   EditUserScreen,
   DepartmentsScreen,
   AddDepartmentScreen,
+  EditDepartmentScreen,
   RolesScreen,
   AddRoleScreen,
 } from '../screens/admin';
+import {
+  AddListingScreen,
+  ManageEntriesScreen,
+  ReportsScreen,
+  ManageLocalitiesScreen,
+} from '../screens/department';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -119,8 +126,13 @@ const RootNavigator: React.FC = () => {
             <Stack.Screen name="AdminEditUser" component={EditUserScreen} />
             <Stack.Screen name="AdminDepartments" component={DepartmentsScreen} />
             <Stack.Screen name="AdminAddDepartment" component={AddDepartmentScreen} />
+            <Stack.Screen name="AdminEditDepartment" component={EditDepartmentScreen} />
             <Stack.Screen name="AdminRoles" component={RolesScreen} />
             <Stack.Screen name="AdminAddRole" component={AddRoleScreen} />
+            <Stack.Screen name="DeptAddListing" component={AddListingScreen} />
+            <Stack.Screen name="DeptManageEntries" component={ManageEntriesScreen} />
+            <Stack.Screen name="DeptReports" component={ReportsScreen} />
+            <Stack.Screen name="DeptLocalities" component={ManageLocalitiesScreen} />
           </Stack.Group>
         )}
       </Stack.Navigator>

@@ -7,9 +7,12 @@ export interface AdminRole {
 }
 
 export interface AdminDepartment {
+  /** Prisma id — needed for update / delete (PATCH|DELETE /departments/:id). */
+  id: string;
   name: string;
   label?: string | null;
   moduleKey: string;
+  isActive?: boolean;
   defaultRole?: {name: string; label?: string | null} | null;
 }
 
@@ -60,10 +63,20 @@ export interface CreateDepartmentBody {
   roleId?: string;
 }
 
+/** Only the display label is editable — name / moduleKey are immutable. */
+export interface UpdateDepartmentBody {
+  label?: string;
+}
+
 export interface CreateRoleBody {
   name: string;
   label?: string;
   permissions?: string[];
+}
+
+export interface DeleteResponse {
+  success: boolean;
+  message: string;
 }
 
 /** Super-admin endpoints (all require a SUPER_ADMIN bearer token). */
@@ -95,4 +108,13 @@ export const adminApi = {
     body: CreateDepartmentBody,
   ): Promise<AdminDepartment> =>
     (await apiClient.post<AdminDepartment>('/departments', body)).data,
+
+  updateDepartment: async (
+    id: string,
+    body: UpdateDepartmentBody,
+  ): Promise<AdminDepartment> =>
+    (await apiClient.patch<AdminDepartment>(`/departments/${id}`, body)).data,
+
+  deleteDepartment: async (id: string): Promise<DeleteResponse> =>
+    (await apiClient.delete<DeleteResponse>(`/departments/${id}`)).data,
 };

@@ -12,6 +12,8 @@ import { EmailModule } from './email/email.module';
 import { RoleModule } from './role/role.module';
 import { DepartmentModule } from './department/department.module';
 import { AdminModule } from './admin/admin.module';
+import { LocationModule } from './location/location.module';
+import { ListingModule } from './listing/listing.module';
 import { MedicineModule } from './modules/medicine/medicine.module';
 import { WaterModule } from './modules/water/water.module';
 
@@ -28,6 +30,9 @@ import { WaterModule } from './modules/water/water.module';
     RoleModule,
     DepartmentModule,
     AdminModule,
+    // Shared location data + generic module entries (Water, etc.).
+    LocationModule,
+    ListingModule,
     // Example module APIs demonstrating role-gated authorization.
     MedicineModule,
     WaterModule,
