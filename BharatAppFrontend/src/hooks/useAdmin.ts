@@ -5,6 +5,7 @@ import {
   CreateDepartmentBody,
   CreateDepartmentUserBody,
   CreateRoleBody,
+  UpdateDepartmentBody,
   UpdateUserBody,
 } from '../api/admin.api';
 
@@ -63,6 +64,31 @@ export const useCreateDepartment = () => {
     onSuccess: () => {
       qc.invalidateQueries({queryKey: ADMIN_KEYS.departments});
       qc.invalidateQueries({queryKey: ADMIN_KEYS.roles});
+      qc.invalidateQueries({queryKey: ADMIN_KEYS.stats});
+    },
+  });
+};
+
+export const useUpdateDepartment = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({id, body}: {id: string; body: UpdateDepartmentBody}) =>
+      adminApi.updateDepartment(id, body),
+    onSuccess: () => {
+      qc.invalidateQueries({queryKey: ADMIN_KEYS.departments});
+    },
+  });
+};
+
+export const useDeleteDepartment = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => adminApi.deleteDepartment(id),
+    onSuccess: () => {
+      // Deleting a department can detach users + drop a role → refresh all.
+      qc.invalidateQueries({queryKey: ADMIN_KEYS.departments});
+      qc.invalidateQueries({queryKey: ADMIN_KEYS.roles});
+      qc.invalidateQueries({queryKey: ['admin', 'users']});
       qc.invalidateQueries({queryKey: ADMIN_KEYS.stats});
     },
   });

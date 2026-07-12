@@ -1,5 +1,5 @@
 import {NavigatorScreenParams} from '@react-navigation/native';
-import {AdminUser} from '../api/admin.api';
+import {AdminUser, AdminDepartment} from '../api/admin.api';
 
 /** Bottom-tab routes (5 tabs per the IA). */
 export type MainTabParamList = {
@@ -39,8 +39,14 @@ export type RootStackParamList = {
   AdminEditUser: {user: AdminUser};
   AdminDepartments: undefined;
   AdminAddDepartment: undefined;
+  AdminEditDepartment: {department: AdminDepartment};
   AdminRoles: undefined;
   AdminAddRole: undefined;
+  // ---- Department manager module blocks ----
+  DeptAddListing: {listingId?: string} | undefined;
+  DeptManageEntries: undefined;
+  DeptReports: undefined;
+  DeptLocalities: undefined;
 };
 
 /** Deep-link targets emitted by AI actions / quick actions. */

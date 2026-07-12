@@ -4,7 +4,15 @@ import {useNavigation} from '@react-navigation/native';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {RootStackParamList} from '../../navigation/types';
 import {useTheme} from '@context/ThemeContext';
-import {Screen, Header, Card, AppText, Button, EmptyState} from '@components/common';
+import {
+  Screen,
+  Header,
+  Card,
+  AppText,
+  Button,
+  Icon,
+  EmptyState,
+} from '@components/common';
 import {useAdminDepartments} from '../../hooks/useAdmin';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
@@ -33,16 +41,29 @@ const DepartmentsScreen: React.FC = () => {
         <EmptyState icon="grid" title="No departments" subtitle="Add your first department." />
       ) : (
         departments.map(d => (
-          <Card key={d.name} style={{marginBottom: theme.spacing.md}}>
-            <View style={{flexDirection: 'row', justifyContent: 'space-between'}}>
-              <AppText variant="title">{d.label ?? d.name}</AppText>
-              <AppText variant="caption" muted>
+          <Card
+            key={d.id}
+            onPress={() =>
+              navigation.navigate('AdminEditDepartment', {department: d})
+            }
+            style={{marginBottom: theme.spacing.md}}>
+            <View
+              style={{
+                flexDirection: 'row',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+              }}>
+              <View style={{flex: 1}}>
+                <AppText variant="title">{d.label ?? d.name}</AppText>
+                <AppText variant="caption" muted style={{marginTop: 2}}>
+                  {d.name} · manager: {d.defaultRole?.name ?? '—'}
+                </AppText>
+              </View>
+              <AppText variant="caption" muted style={{marginRight: theme.spacing.sm}}>
                 {d.moduleKey}
               </AppText>
+              <Icon name="chevron-right" size={18} color={theme.colors.textMuted} />
             </View>
-            <AppText variant="caption" muted style={{marginTop: 2}}>
-              {d.name} · manager: {d.defaultRole?.name ?? '—'}
-            </AppText>
           </Card>
         ))
       )}

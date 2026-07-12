@@ -30,6 +30,9 @@ model User {
   departmentId String?
   department   Department? @relation(fields: [departmentId], references: [id])
 
+  // Module entries this user authored (Water updates, etc.). Optional relation.
+  listings Listing[] @relation("ListingCreatedBy")
+
   @@index([roleId])
   @@index([departmentId])
 }
@@ -66,4 +69,91 @@ model Department {
   updatedAt     DateTime @updatedAt
 
   @@index([defaultRoleId])
+}
+
+/// ---- Location hierarchy: State → District → City → Locality ----
+/// Shared reference data used by every module. Cascade deletes flow downward,
+/// so removing a State cleans up its Districts → Cities → Localities.
+
+model State {
+  id        String     @id @default(cuid())
+  name      String     @unique
+  districts District[]
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+}
+
+model District {
+  id        String   @id @default(cuid())
+  name      String
+  stateId   String
+  state     State    @relation(fields: [stateId], references: [id], onDelete: Cascade)
+  cities    City[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([stateId, name])
+  @@index([stateId])
+}
+
+model City {
+  id         String     @id @default(cuid())
+  name       String
+  districtId String
+  district   District   @relation(fields: [districtId], references: [id], onDelete: Cascade)
+  localities Locality[]
+  listings   Listing[]
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+
+  @@unique([districtId, name])
+  @@index([districtId])
+}
+
+model Locality {
+  id        String    @id @default(cuid())
+  name      String
+  pincode   String?
+  latitude  Float?
+  longitude Float?
+  cityId    String
+  city      City      @relation(fields: [cityId], references: [id], onDelete: Cascade)
+  listings  Listing[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@unique([cityId, name])
+  @@index([cityId])
+}
+
+/// A generic module entry — one flexible table serving every department module.
+/// `moduleKey` ties it to a Department/module (e.g. "water"). `type` describes
+/// the kind of entry ("update", "alert", "listing", …). `data` holds any
+/// module-specific extras as JSON so new departments need no schema change.
+model Listing {
+  id          String    @id @default(cuid())
+  moduleKey   String
+  type        String    @default("update")
+  title       String
+  body        String?
+  status      String    @default("active") // active | scheduled | archived | expired
+  scheduledAt DateTime?
+  expiresAt   DateTime?
+  data        Json?
+
+  cityId     String?
+  city       City?     @relation(fields: [cityId], references: [id], onDelete: SetNull)
+  localityId String?
+  locality   Locality? @relation(fields: [localityId], references: [id], onDelete: SetNull)
+
+  createdById String?
+  createdBy   User?    @relation("ListingCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([moduleKey])
+  @@index([cityId])
+  @@index([localityId])
+  @@index([status])
 }
