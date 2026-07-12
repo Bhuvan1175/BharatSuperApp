@@ -1,4 +1,5 @@
 import {NavigatorScreenParams} from '@react-navigation/native';
+import {AdminUser} from '../api/admin.api';
 
 /** Bottom-tab routes (5 tabs per the IA). */
 export type MainTabParamList = {
@@ -30,6 +31,16 @@ export type RootStackParamList = {
   Saved: undefined;
   EditProfile: undefined;
   UserSearch: undefined;
+  // Shared account hub for managers / admin (edit profile · settings · logout).
+  Account: undefined;
+  // ---- Super Admin panel ----
+  AdminDepartmentUsers: {department: string; label?: string};
+  AdminAddUser: {department: string};
+  AdminEditUser: {user: AdminUser};
+  AdminDepartments: undefined;
+  AdminAddDepartment: undefined;
+  AdminRoles: undefined;
+  AdminAddRole: undefined;
 };
 
 /** Deep-link targets emitted by AI actions / quick actions. */

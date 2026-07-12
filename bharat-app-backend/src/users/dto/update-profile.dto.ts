@@ -28,4 +28,13 @@ export class UpdateProfileDto {
     message: 'Bio must not exceed 150 characters',
   })
   bio?: string;
+
+  // Mobile number — editable. Stored as the 10-digit number (the app shows the
+  // +91 prefix). It is @unique in the schema, so a duplicate returns 409.
+  @IsOptional()
+  @IsString()
+  @Matches(/^[6-9]\d{9}$/, {
+    message: 'Enter a valid 10-digit Indian mobile number',
+  })
+  phoneNumber?: string;
 }

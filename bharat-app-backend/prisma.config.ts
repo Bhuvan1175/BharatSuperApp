@@ -7,6 +7,9 @@ export default defineConfig({
   schema: "prisma/schema.prisma",
   migrations: {
     path: "prisma/migrations",
+    // Seed the system roles, departments and the bootstrap super-admin.
+    // Run with:  npx prisma db seed
+    seed: "ts-node prisma/seed.ts",
   },
   datasource: {
     url: process.env["DATABASE_URL"]!,

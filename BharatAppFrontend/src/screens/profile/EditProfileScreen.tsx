@@ -27,7 +27,7 @@ const EditProfileScreen: React.FC<Props> = ({navigation}) => {
 
   const [name, setName] = useState(user?.name ?? '');
   const [username, setUsername] = useState(user?.username ?? '');
-  const [email, setEmail] = useState(user?.email ?? '');
+  const [phone, setPhone] = useState(user?.phoneNumber ?? '');
   const [bio, setBio] = useState(user?.bio ?? '');
   // Local preview shown immediately after picking, before the upload finishes.
   const [localUri, setLocalUri] = useState<string | undefined>();
@@ -88,12 +88,14 @@ const EditProfileScreen: React.FC<Props> = ({navigation}) => {
   };
 
   const onSave = () => {
+    // NOTE: `email` is deliberately NOT sent — it's the login identity and is
+    // read-only. Sending it would be rejected by the backend (forbidNonWhitelisted).
     const payload: UpdateProfilePayload = {
       name: name.trim(),
       bio: bio.trim(),
     };
     if (username.trim()) payload.username = username.trim().toLowerCase();
-    if (email.trim()) payload.email = email.trim();
+    if (phone.trim()) payload.phoneNumber = phone.trim();
 
     updateProfile.mutate(payload, {
       onSuccess: () => {
@@ -154,15 +156,23 @@ const EditProfileScreen: React.FC<Props> = ({navigation}) => {
         autoCorrect={false}
         containerStyle={{marginBottom: theme.spacing.lg}}
       />
+      {/* Mobile number — editable. Stored as 10 digits; +91 is the display prefix. */}
       <Input
-        label="Email"
+        label="Mobile number"
+        icon="phone"
+        value={phone}
+        onChangeText={txt => setPhone(txt.replace(/[^0-9]/g, ''))}
+        placeholder="10-digit mobile number"
+        keyboardType="phone-pad"
+        maxLength={10}
+        containerStyle={{marginBottom: theme.spacing.lg}}
+      />
+      {/* Email — READ-ONLY. It's the login identity and cannot be changed. */}
+      <Input
+        label="Email (cannot be changed)"
         icon="mail"
-        value={email}
-        onChangeText={setEmail}
-        placeholder="you@example.com"
-        keyboardType="email-address"
-        autoCapitalize="none"
-        autoCorrect={false}
+        value={user?.email ?? ''}
+        editable={false}
         containerStyle={{marginBottom: theme.spacing.lg}}
       />
       <Input
@@ -173,13 +183,6 @@ const EditProfileScreen: React.FC<Props> = ({navigation}) => {
         placeholder="Tell people about yourself (max 150 chars)"
         multiline
         maxLength={150}
-        containerStyle={{marginBottom: theme.spacing.lg}}
-      />
-      <Input
-        label="Phone"
-        icon="phone"
-        value={`+91 ${user?.phoneNumber ?? ''}`}
-        editable={false}
         containerStyle={{marginBottom: theme.spacing.lg}}
       />
 

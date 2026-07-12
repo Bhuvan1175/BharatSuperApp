@@ -22,4 +22,48 @@ model User {
   lastLoginDevice      String?
   createdAt            DateTime  @default(now())
   updatedAt            DateTime  @updatedAt
+
+  // ---- RBAC (added; all optional/defaulted → additive, non-breaking) ----
+  isActive     Boolean     @default(true)
+  roleId       String?
+  role         Role?       @relation(fields: [roleId], references: [id])
+  departmentId String?
+  department   Department? @relation(fields: [departmentId], references: [id])
+
+  @@index([roleId])
+  @@index([departmentId])
+}
+
+/// A role a user can hold. Data-driven so a Super Admin can create new roles at
+/// runtime. `permissions` are strings like "medicine:manage"; "*" = all.
+model Role {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  label       String?
+  permissions String[] @default([])
+  // System roles are seeded and must not be deleted via the admin API.
+  isSystem    Boolean  @default(false)
+  users       User[]
+  // Departments for which this role is the default manager role.
+  defaultForDepartments Department[] @relation("DepartmentDefaultRole")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+/// A department that owns one app module. `moduleKey` (e.g. "medicine") ties the
+/// department to a module and matches the frontend module keys. `defaultRole`
+/// is the manager role auto-assigned when a user is put in this department.
+model Department {
+  id            String   @id @default(cuid())
+  name          String   @unique
+  label         String?
+  moduleKey     String   @unique
+  isActive      Boolean  @default(true)
+  defaultRoleId String?
+  defaultRole   Role?    @relation("DepartmentDefaultRole", fields: [defaultRoleId], references: [id])
+  users         User[]
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([defaultRoleId])
 }

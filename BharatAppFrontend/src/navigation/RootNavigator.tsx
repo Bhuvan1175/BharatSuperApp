@@ -9,7 +9,10 @@ import {useTheme} from '../context/ThemeContext';
 import {useAuth} from '../context/AuthContext';
 import {useAuthStore} from '../store/authStore';
 
-import BottomTabNavigator from './BottomTabNavigator';
+// RoleRouter replaces the direct BottomTabNavigator mount: it inspects the
+// signed-in user's role and renders the correct home surface. For a citizen it
+// renders the very same BottomTabNavigator as before — so nothing regresses.
+import RoleRouter from './RoleRouter';
 import OnboardingScreen from '../screens/auth/OnboardingScreen';
 import LoginScreen from '../screens/auth/LoginScreen';
 import OtpScreen from '../screens/auth/OtpScreen';
@@ -29,6 +32,16 @@ import SettingsScreen from '../screens/profile/SettingsScreen';
 import SavedScreen from '../screens/profile/SavedScreen';
 import EditProfileScreen from '../screens/profile/EditProfileScreen';
 import UserSearchScreen from '../screens/search/UserSearchScreen';
+import AccountScreen from '../screens/account/AccountScreen';
+import {
+  DepartmentUsersScreen,
+  AddUserScreen,
+  EditUserScreen,
+  DepartmentsScreen,
+  AddDepartmentScreen,
+  RolesScreen,
+  AddRoleScreen,
+} from '../screens/admin';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -80,8 +93,11 @@ const RootNavigator: React.FC = () => {
           </Stack.Group>
         ) : (
           // ---- Authenticated app ----
+          // `Main` is now the RoleRouter, which mounts the dashboard that
+          // matches the user's role. Every other screen below stays exactly as
+          // it was and remains reachable from the citizen flow.
           <Stack.Group>
-            <Stack.Screen name="Main" component={BottomTabNavigator} />
+            <Stack.Screen name="Main" component={RoleRouter} />
             <Stack.Screen name="Permissions" component={PermissionsScreen} />
             <Stack.Screen name="Biometric" component={BiometricScreen} />
             <Stack.Screen name="AIChat" component={AIChatScreen} options={{animation: 'slide_from_bottom'}} />
@@ -97,6 +113,14 @@ const RootNavigator: React.FC = () => {
             <Stack.Screen name="Saved" component={SavedScreen} />
             <Stack.Screen name="EditProfile" component={EditProfileScreen} />
             <Stack.Screen name="UserSearch" component={UserSearchScreen} />
+            <Stack.Screen name="Account" component={AccountScreen} />
+            <Stack.Screen name="AdminDepartmentUsers" component={DepartmentUsersScreen} />
+            <Stack.Screen name="AdminAddUser" component={AddUserScreen} />
+            <Stack.Screen name="AdminEditUser" component={EditUserScreen} />
+            <Stack.Screen name="AdminDepartments" component={DepartmentsScreen} />
+            <Stack.Screen name="AdminAddDepartment" component={AddDepartmentScreen} />
+            <Stack.Screen name="AdminRoles" component={RolesScreen} />
+            <Stack.Screen name="AdminAddRole" component={AddRoleScreen} />
           </Stack.Group>
         )}
       </Stack.Navigator>

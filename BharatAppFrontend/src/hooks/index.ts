@@ -3,3 +3,5 @@ export {useTranslation} from './useTranslation';
 export {useDebounce} from './useDebounce';
 export {useRotatingText} from './useRotatingText';
 export {useCountdown} from './useCountdown';
+export {useRole} from './useRole';
+export {usePermissions} from './usePermissions';
