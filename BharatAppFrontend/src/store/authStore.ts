@@ -1,105 +1,106 @@
 import {create} from 'zustand';
-import {ApiUser} from '../api/types';
+import {ApiDepartment, ApiUser} from '../api/types';
 import {authApi} from '../api/auth.api';
 import {usersApi} from '../api/users.api';
 import {tokenStorage} from '../api/tokenStorage';
 import {setOnAuthLogout} from '../api/client';
-import {
-  DEFAULT_ROLE,
-  Department,
-  getRoleConfig,
-  MOCK_ROLE,
-  normalizeRole,
-  Permission,
-  Role,
-  USE_MOCK_ROLE,
-} from '@/rbac';
+import {MOCK_ROLE, MODULES, ModuleKey, ROLE_CONFIG, USE_MOCK_ROLE} from '@/rbac';
 
-interface AuthState {
-  /** The logged-in user, or null when signed out. */
+/**
+ * The RBAC slice is now BACKEND-DRIVEN: role name, department object and
+ * permissions come straight from the logged-in user (verify-otp / profile), not
+ * from a hardcoded frontend table. This is what lets a brand-new department
+ * (created at runtime by the super admin) get a working dashboard with no app
+ * rebuild — the frontend simply trusts the backend's role + department.
+ */
+interface RbacSlice {
+  /** Backend role NAME, e.g. 'MEDICINE_MANAGER', 'SUPER_ADMIN', 'PUBLIC_USER'. */
+  role: string;
+  /** The user's department (managers only), or null. */
+  department: ApiDepartment | null;
+  /** Permission strings from the backend role, e.g. ['medicine:manage']. */
+  permissions: string[];
+}
+
+interface AuthState extends RbacSlice {
   user: ApiUser | null;
-  /** True once we have a valid session. */
   isAuthenticated: boolean;
-  /** True while the app is checking storage for an existing session at startup. */
   isBootstrapping: boolean;
 
-  /* ---- RBAC slice (kept in sync with the current role) ---- */
-  /** The current user's role (drives dashboard routing & guards). */
-  role: Role;
-  /** The role's owning department, or null for citizen / super-admin. */
-  department: Department | null;
-  /** The role's flat permission list. */
-  permissions: Permission[];
-
-  /** Called after a successful verify-otp: persist tokens + set the user. */
   setSession: (
     user: ApiUser,
     accessToken: string,
     refreshToken: string,
   ) => Promise<void>;
-  /** Replace the current user (e.g. after profile update / image upload). */
   setUser: (user: ApiUser) => void;
-  /** Set the role directly — used by the DevRoleSwitcher when mocking. */
-  setRole: (role: Role) => void;
-  /** App-startup check: load tokens, validate by fetching the profile. */
+  /** Set role by name — used only by the DevRoleSwitcher in mock mode. */
+  setRole: (roleName: string) => void;
   bootstrap: () => Promise<void>;
-  /** User-initiated logout: tell the backend, then clear everything. */
   logout: () => Promise<void>;
-  /** Local-only logout used by the axios interceptor when refresh fails. */
   forceLogout: () => void;
 }
 
-/**
- * Derive the RBAC slice from a role in ONE place, so role/department/permissions
- * can never drift apart.
- */
-const roleSlice = (
-  role: Role,
-): Pick<AuthState, 'role' | 'department' | 'permissions'> => {
-  const cfg = getRoleConfig(role);
-  return {role, department: cfg.department, permissions: cfg.permissions};
+const EMPTY: RbacSlice = {
+  role: 'PUBLIC_USER',
+  department: null,
+  permissions: [],
 };
 
-/**
- * resolveRole — THE single seam between "who the user is" and "what role they
- * have".
- *   • Mock (USE_MOCK_ROLE true): returns MOCK_ROLE.
- *   • Live (now): reads the role NAME from the backend user (`role.name`) and
- *     maps it via normalizeRole (unknown/missing → PUBLIC_USER).
- */
-const resolveRole = (user: ApiUser | null): Role =>
-  USE_MOCK_ROLE ? MOCK_ROLE : normalizeRole(user?.role?.name);
+/** Live mode: derive the RBAC slice from the backend user object. */
+const sliceFromUser = (user: ApiUser | null): RbacSlice => ({
+  role: user?.role?.name ?? 'PUBLIC_USER',
+  department: user?.department ?? null,
+  permissions: user?.role?.permissions ?? [],
+});
+
+/** Mock mode: derive from the frontend ROLE_CONFIG for known roles. */
+const sliceFromRole = (roleName: string): RbacSlice => {
+  const cfg = ROLE_CONFIG[roleName as keyof typeof ROLE_CONFIG];
+  if (!cfg) {
+    return {role: roleName, department: null, permissions: []};
+  }
+  const moduleKey = cfg.modules[0] as ModuleKey | undefined;
+  const mod = moduleKey ? MODULES[moduleKey] : undefined;
+  const department: ApiDepartment | null = cfg.department
+    ? {name: cfg.department, label: mod?.label ?? cfg.label, moduleKey}
+    : null;
+  return {
+    role: roleName,
+    department,
+    permissions: cfg.permissions as string[],
+  };
+};
+
+const resolveSlice = (user: ApiUser | null): RbacSlice =>
+  USE_MOCK_ROLE ? sliceFromRole(MOCK_ROLE) : sliceFromUser(user);
 
 export const useAuthStore = create<AuthState>(set => ({
   user: null,
   isAuthenticated: false,
   isBootstrapping: true,
-  ...roleSlice(DEFAULT_ROLE),
+  ...EMPTY,
 
   setSession: async (user, accessToken, refreshToken) => {
     await tokenStorage.saveTokens(accessToken, refreshToken);
-    set({user, isAuthenticated: true, ...roleSlice(resolveRole(user))});
+    set({user, isAuthenticated: true, ...resolveSlice(user)});
   },
 
   setUser: user => set({user}),
 
-  setRole: role => set(roleSlice(role)),
+  setRole: roleName => set(sliceFromRole(roleName)),
 
   bootstrap: async () => {
     try {
       const token = await tokenStorage.getAccessToken();
       if (!token) {
-        set({user: null, isAuthenticated: false, ...roleSlice(DEFAULT_ROLE)});
+        set({user: null, isAuthenticated: false, ...EMPTY});
         return;
       }
-      // A token exists → validate it by fetching the profile.
-      // The axios interceptor auto-refreshes if the access token is expired.
       const user = await usersApi.getProfile();
-      set({user, isAuthenticated: true, ...roleSlice(resolveRole(user))});
+      set({user, isAuthenticated: true, ...resolveSlice(user)});
     } catch {
-      // Token invalid or refresh failed → start clean.
       await tokenStorage.clearTokens();
-      set({user: null, isAuthenticated: false, ...roleSlice(DEFAULT_ROLE)});
+      set({user: null, isAuthenticated: false, ...EMPTY});
     } finally {
       set({isBootstrapping: false});
     }
@@ -107,22 +108,17 @@ export const useAuthStore = create<AuthState>(set => ({
 
   logout: async () => {
     try {
-      await authApi.logout(); // best-effort: clears refresh token server-side
+      await authApi.logout();
     } catch {
       // ignore network / 401 — we always log out locally
     }
     await tokenStorage.clearTokens();
-    set({user: null, isAuthenticated: false, ...roleSlice(DEFAULT_ROLE)});
+    set({user: null, isAuthenticated: false, ...EMPTY});
   },
 
-  forceLogout: () => {
-    // Interceptor already cleared tokens; just reset in-memory state.
-    set({user: null, isAuthenticated: false, ...roleSlice(DEFAULT_ROLE)});
-  },
+  forceLogout: () => set({user: null, isAuthenticated: false, ...EMPTY}),
 }));
 
-// Wire the axios interceptor's "refresh failed" path to this store so an
-// expired refresh token cleanly logs the user out. Registered once at import.
 setOnAuthLogout(() => {
   useAuthStore.getState().forceLogout();
 });

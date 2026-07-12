@@ -1,36 +1,29 @@
-import {
-  canManageModule,
-  canViewModule,
-  getAccessibleModules,
-  hasPermission,
-  isDepartmentRole,
-  ModuleKey,
-  Permission,
-} from '@/rbac';
-import {useRole} from './useRole';
+import {useAuthStore} from '../store/authStore';
 
 /**
- * usePermissions — ergonomic, role-aware capability checks for screens and
- * components. Ask capabilities ("can I manage fuel?"), never identities ("am I
- * the fuel manager?"), so UI written today keeps working when new roles exist.
- *
- * Example:
- *   const {canManage} = usePermissions();
- *   {canManage('medicine') && <Button label="Add listing" ... />}
+ * usePermissions — capability checks driven entirely by the backend-provided
+ * role / department / permissions on the auth store. Works for any role,
+ * including departments created at runtime.
  */
 export const usePermissions = () => {
-  const role = useRole();
+  const role = useAuthStore(s => s.role);
+  const department = useAuthStore(s => s.department);
+  const permissions = useAuthStore(s => s.permissions);
+
+  const can = (permission: string) =>
+    permissions.includes('*') || permissions.includes(permission);
+
   return {
     role,
-    /** Does the current role hold this permission? */
-    can: (permission: Permission) => hasPermission(role, permission),
-    /** Can the current role view this module? */
-    canView: (module: ModuleKey) => canViewModule(role, module),
-    /** Can the current role manage this module? */
-    canManage: (module: ModuleKey) => canManageModule(role, module),
-    /** Modules the current role may enter. */
-    accessibleModules: getAccessibleModules(role),
-    /** True for department managers (not citizen / super-admin). */
-    isDepartment: isDepartmentRole(role),
+    department,
+    permissions,
+    /** Does the user hold this exact permission? ('*' grants all.) */
+    can,
+    /** Can the user view a module? */
+    canView: (moduleKey: string) => can(`${moduleKey}:view`),
+    /** Can the user manage a module? */
+    canManage: (moduleKey: string) => can(`${moduleKey}:manage`),
+    isSuperAdmin: role === 'SUPER_ADMIN',
+    isDepartmentManager: !!department && role !== 'SUPER_ADMIN',
   };
 };

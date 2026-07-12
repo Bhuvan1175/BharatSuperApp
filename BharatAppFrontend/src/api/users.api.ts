@@ -8,9 +8,10 @@ import {
 
 export interface UpdateProfilePayload {
   name?: string;
-  email?: string;
   username?: string;
   bio?: string;
+  /** 10-digit mobile number (editable). Email is NOT here — it's read-only. */
+  phoneNumber?: string;
 }
 
 /** Users endpoints (/api/users/*). */

@@ -1,34 +1,25 @@
 import React from 'react';
 import {View} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
-import {
-  canManageModule,
-  canViewModule,
-  hasPermission,
-  ModuleKey,
-  Permission,
-  Role,
-} from '@/rbac';
-import {useRole} from '@hooks/useRole';
 import {useTheme} from '@context/ThemeContext';
 import {AppText, Button, EmptyState} from '@components/common';
+import {usePermissions} from '@hooks/usePermissions';
 import {navigationRef} from './navigationRef';
 
 interface RoleGuardProps {
   children: React.ReactNode;
-  /** Allow only these roles. */
-  roles?: Role[];
+  /** Allow only these role names. */
+  roles?: string[];
   /** Require this exact permission (e.g. 'fuel:manage'). */
-  permission?: Permission;
-  /** Require access to this module — view by default. */
-  module?: ModuleKey;
-  /** With `module`, require MANAGE instead of view. */
+  permission?: string;
+  /** Require access to this module by key (e.g. 'fuel'). */
+  moduleKey?: string;
+  /** With `moduleKey`, require MANAGE instead of view. */
   requireManage?: boolean;
   /** Custom denied UI (defaults to an Access-restricted screen). */
   fallback?: React.ReactNode;
 }
 
-/** Shown when the current role fails the guard. */
 const DefaultDenied: React.FC = () => {
   const {theme} = useTheme();
   const canBack = navigationRef.isReady() && navigationRef.canGoBack();
@@ -53,40 +44,25 @@ const DefaultDenied: React.FC = () => {
 };
 
 /**
- * RoleGuard — declarative, frontend role protection for any subtree.
- *
- * The guard PASSES only if every constraint you pass is satisfied for the
- * current role (from useRole). Constraints compose with AND:
- *
- *   <RoleGuard roles={['SUPER_ADMIN']}>            … only super admin
- *   <RoleGuard module="fuel" requireManage>        … only who can manage fuel
- *   <RoleGuard permission="scheme:view">           … a specific permission
- *
- * It reads capabilities from the RBAC layer, never a hardcoded role name, so
- * new roles are covered automatically. Because it uses useRole(), it needs no
- * changes when the role source becomes the Zustand store / backend JWT.
- *
- * NOTE: RoleRouter already ensures a role only mounts its OWN dashboard; this
- * guard is defense-in-depth and the mechanism for protecting future per-module
- * "manage" screens.
+ * RoleGuard — declarative, backend-driven role protection. Constraints compose
+ * with AND. Uses the permissions the backend put on the auth store, so new
+ * roles/modules are covered automatically.
  */
 const RoleGuard: React.FC<RoleGuardProps> = ({
   children,
   roles,
   permission,
-  module,
+  moduleKey,
   requireManage,
   fallback,
 }) => {
-  const role = useRole();
+  const {role, can} = usePermissions();
 
   const allowed =
     (!roles || roles.includes(role)) &&
-    (!permission || hasPermission(role, permission)) &&
-    (!module ||
-      (requireManage
-        ? canManageModule(role, module)
-        : canViewModule(role, module)));
+    (!permission || can(permission)) &&
+    (!moduleKey ||
+      can(`${moduleKey}:${requireManage ? 'manage' : 'view'}`));
 
   if (!allowed) {
     return <>{fallback ?? <DefaultDenied />}</>;

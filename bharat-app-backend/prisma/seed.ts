@@ -54,14 +54,22 @@ const ROLES: {
   },
 ];
 
-/** Departments — one per app module. `moduleKey` matches the frontend. */
-const DEPARTMENTS: { name: string; label: string; moduleKey: string }[] = [
-  { name: 'MEDICINE', label: 'Medicines', moduleKey: 'medicine' },
-  { name: 'FUEL', label: 'Fuel', moduleKey: 'fuel' },
-  { name: 'WATER', label: 'Water', moduleKey: 'water' },
-  { name: 'ELECTRICITY', label: 'Electricity', moduleKey: 'electricity' },
-  { name: 'SCHEME', label: 'Government Schemes', moduleKey: 'scheme' },
-  { name: 'AREA', label: 'Area Intelligence', moduleKey: 'area' },
+/**
+ * Departments — one per app module. `moduleKey` matches the frontend.
+ * `managerRole` is the role name linked as the department's default role.
+ */
+const DEPARTMENTS: {
+  name: string;
+  label: string;
+  moduleKey: string;
+  managerRole: string;
+}[] = [
+  { name: 'MEDICINE', label: 'Medicines', moduleKey: 'medicine', managerRole: 'MEDICINE_MANAGER' },
+  { name: 'FUEL', label: 'Fuel', moduleKey: 'fuel', managerRole: 'FUEL_MANAGER' },
+  { name: 'WATER', label: 'Water', moduleKey: 'water', managerRole: 'WATER_MANAGER' },
+  { name: 'ELECTRICITY', label: 'Electricity', moduleKey: 'electricity', managerRole: 'ELECTRICITY_MANAGER' },
+  { name: 'SCHEME', label: 'Government Schemes', moduleKey: 'scheme', managerRole: 'SCHEME_MANAGER' },
+  { name: 'AREA', label: 'Area Intelligence', moduleKey: 'area', managerRole: 'AREA_MANAGER' },
 ];
 
 async function main() {
@@ -78,12 +86,20 @@ async function main() {
     });
   }
 
-  // Departments
+  // Departments — created/updated and linked to their default manager role.
   for (const d of DEPARTMENTS) {
+    const role = await prisma.role.findUniqueOrThrow({
+      where: { name: d.managerRole },
+    });
     await prisma.department.upsert({
       where: { name: d.name },
-      update: { label: d.label, moduleKey: d.moduleKey },
-      create: d,
+      update: { label: d.label, moduleKey: d.moduleKey, defaultRoleId: role.id },
+      create: {
+        name: d.name,
+        label: d.label,
+        moduleKey: d.moduleKey,
+        defaultRoleId: role.id,
+      },
     });
   }
 
@@ -110,7 +126,7 @@ async function main() {
   }
 
   console.log(
-    `✅ Seeded ${ROLES.length} roles and ${DEPARTMENTS.length} departments.`,
+    `✅ Seeded ${ROLES.length} roles and ${DEPARTMENTS.length} departments (linked to manager roles).`,
   );
 }
 

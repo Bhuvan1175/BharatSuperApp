@@ -24,14 +24,9 @@ model User {
   updatedAt            DateTime  @updatedAt
 
   // ---- RBAC (added; all optional/defaulted → additive, non-breaking) ----
-  // Whether the account is active. Deactivating a department user blocks login
-  // and all requests immediately.
   isActive     Boolean     @default(true)
-  // The user's role (Citizen / Super Admin / a department manager). Optional so
-  // existing rows keep working; verify-otp assigns PUBLIC_USER to new citizens.
   roleId       String?
   role         Role?       @relation(fields: [roleId], references: [id])
-  // The department a manager belongs to (null for citizens / super-admin).
   departmentId String?
   department   Department? @relation(fields: [departmentId], references: [id])
 
@@ -49,19 +44,26 @@ model Role {
   // System roles are seeded and must not be deleted via the admin API.
   isSystem    Boolean  @default(false)
   users       User[]
+  // Departments for which this role is the default manager role.
+  defaultForDepartments Department[] @relation("DepartmentDefaultRole")
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 }
 
 /// A department that owns one app module. `moduleKey` (e.g. "medicine") ties the
-/// department to a module and matches the frontend module keys.
+/// department to a module and matches the frontend module keys. `defaultRole`
+/// is the manager role auto-assigned when a user is put in this department.
 model Department {
-  id        String   @id @default(cuid())
-  name      String   @unique
-  label     String?
-  moduleKey String   @unique
-  isActive  Boolean  @default(true)
-  users     User[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id            String   @id @default(cuid())
+  name          String   @unique
+  label         String?
+  moduleKey     String   @unique
+  isActive      Boolean  @default(true)
+  defaultRoleId String?
+  defaultRole   Role?    @relation("DepartmentDefaultRole", fields: [defaultRoleId], references: [id])
+  users         User[]
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([defaultRoleId])
 }

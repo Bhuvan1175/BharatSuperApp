@@ -1,38 +1,32 @@
 import React from 'react';
 import {View, ScrollView} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
-import {getRoleConfig, MODULES, ModuleKey} from '@/rbac';
-import {useRole} from '@hooks/useRole';
+import {MODULES, ModuleKey} from '@/rbac';
+import {useAuthStore} from '@/store/authStore';
 import {useTheme} from '@context/ThemeContext';
 import {AppText, Card, Icon, SectionHeader, EmptyState} from '@components/common';
 import RoleGuard from '@navigation/RoleGuard';
 import StatisticsCard from './StatisticsCard';
 import QuickActionCard from './QuickActionCard';
-
-interface Props {
-  /** The module this dashboard manages. */
-  module: ModuleKey;
-}
+import AccountButton from './AccountButton';
 
 /**
- * DepartmentDashboard — one reusable, config-driven template shared by ALL six
- * department manager dashboards. Each department screen is a 3-line wrapper
- * that passes its `module`; there is no per-department layout duplication.
+ * DepartmentDashboard — ONE generic dashboard for every department manager.
+ * It reads the department straight from the auth store (backend-provided), so
+ * it renders correctly for any department — including ones the app didn't know
+ * about at compile time. For known modules it uses the MODULES catalogue for
+ * icon/colour; for unknown ones it falls back to sensible defaults.
  *
- * Now composed from the Step 7 reusable components (StatisticsCard,
- * QuickActionCard) — the inline card markup is gone. Wrapped in a RoleGuard
- * that requires MANAGE rights on the module. Placeholder only — no APIs; when
- * the backend module endpoints land, only this one file needs data wiring.
+ * Placeholder only (no data APIs yet). The `module` prop is accepted but unused
+ * (kept so the old per-department wrapper screens still compile).
  */
 
-/** Placeholder KPIs every department shows. */
 const STATS: {key: string; label: string}[] = [
   {key: 'total', label: 'Total Listings'},
   {key: 'active', label: 'Active'},
   {key: 'pending', label: 'Pending'},
 ];
 
-/** Placeholder management actions (inert until backend module APIs exist). */
 const MANAGE_ACTIONS: {key: string; label: string; icon: string}[] = [
   {key: 'add', label: 'Add Listing', icon: 'plus-circle'},
   {key: 'manage', label: 'Manage Entries', icon: 'edit-3'},
@@ -40,14 +34,19 @@ const MANAGE_ACTIONS: {key: string; label: string; icon: string}[] = [
   {key: 'settings', label: 'Module Settings', icon: 'sliders'},
 ];
 
-const DepartmentDashboard: React.FC<Props> = ({module}) => {
+const DepartmentDashboard: React.FC<{module?: string}> = () => {
   const {theme} = useTheme();
-  const role = useRole();
-  const cfg = getRoleConfig(role);
-  const mod = MODULES[module];
+  const department = useAuthStore(s => s.department);
+  const role = useAuthStore(s => s.role);
+
+  const moduleKey = department?.moduleKey;
+  const meta = moduleKey ? MODULES[moduleKey as ModuleKey] : undefined;
+  const color = meta?.color ?? theme.colors.primary;
+  const icon = meta?.icon ?? 'grid';
+  const title = department?.label ?? department?.name ?? 'Department';
 
   return (
-    <RoleGuard module={module} requireManage>
+    <RoleGuard moduleKey={moduleKey} requireManage>
       <SafeAreaView
         edges={['top']}
         style={{flex: 1, backgroundColor: theme.colors.background}}>
@@ -57,7 +56,7 @@ const DepartmentDashboard: React.FC<Props> = ({module}) => {
             padding: theme.spacing.lg,
             paddingBottom: theme.spacing.giant,
           }}>
-          {/* ---- Header: module identity + role ---- */}
+          {/* ---- Header: department identity + account ---- */}
           <View
             style={{
               flexDirection: 'row',
@@ -71,18 +70,19 @@ const DepartmentDashboard: React.FC<Props> = ({module}) => {
                 borderRadius: theme.radius.md,
                 alignItems: 'center',
                 justifyContent: 'center',
-                backgroundColor: mod.color + '22',
+                backgroundColor: color + '22',
               }}>
-              <Icon name={mod.icon} size={24} color={mod.color} />
+              <Icon name={icon} size={24} color={color} />
             </View>
             <View style={{flex: 1}}>
               <AppText variant="h2" numberOfLines={1}>
-                {mod.label}
+                {title}
               </AppText>
               <AppText variant="caption" muted numberOfLines={1}>
-                {cfg.label}
+                {role}
               </AppText>
             </View>
+            <AccountButton />
           </View>
 
           {/* ---- Manager badge ---- */}
@@ -133,7 +133,7 @@ const DepartmentDashboard: React.FC<Props> = ({module}) => {
                   key={a.key}
                   label={a.label}
                   icon={a.icon}
-                  color={mod.color}
+                  color={color}
                   hint="Coming soon"
                   style={{width: '48%', marginBottom: theme.spacing.md}}
                 />

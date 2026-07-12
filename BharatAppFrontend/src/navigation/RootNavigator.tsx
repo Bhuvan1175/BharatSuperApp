@@ -32,6 +32,16 @@ import SettingsScreen from '../screens/profile/SettingsScreen';
 import SavedScreen from '../screens/profile/SavedScreen';
 import EditProfileScreen from '../screens/profile/EditProfileScreen';
 import UserSearchScreen from '../screens/search/UserSearchScreen';
+import AccountScreen from '../screens/account/AccountScreen';
+import {
+  DepartmentUsersScreen,
+  AddUserScreen,
+  EditUserScreen,
+  DepartmentsScreen,
+  AddDepartmentScreen,
+  RolesScreen,
+  AddRoleScreen,
+} from '../screens/admin';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -103,6 +113,14 @@ const RootNavigator: React.FC = () => {
             <Stack.Screen name="Saved" component={SavedScreen} />
             <Stack.Screen name="EditProfile" component={EditProfileScreen} />
             <Stack.Screen name="UserSearch" component={UserSearchScreen} />
+            <Stack.Screen name="Account" component={AccountScreen} />
+            <Stack.Screen name="AdminDepartmentUsers" component={DepartmentUsersScreen} />
+            <Stack.Screen name="AdminAddUser" component={AddUserScreen} />
+            <Stack.Screen name="AdminEditUser" component={EditUserScreen} />
+            <Stack.Screen name="AdminDepartments" component={DepartmentsScreen} />
+            <Stack.Screen name="AdminAddDepartment" component={AddDepartmentScreen} />
+            <Stack.Screen name="AdminRoles" component={RolesScreen} />
+            <Stack.Screen name="AdminAddRole" component={AddRoleScreen} />
           </Stack.Group>
         )}
       </Stack.Navigator>

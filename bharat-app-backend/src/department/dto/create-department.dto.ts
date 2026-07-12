@@ -18,4 +18,13 @@ export class CreateDepartmentDto {
     message: 'moduleKey must be lower_snake_case (e.g. transport)',
   })
   moduleKey!: string;
+
+  /**
+   * OPTIONAL: link an EXISTING role as the department's default (manager) role.
+   * If omitted, a new "<NAME>_MANAGER" role is auto-created with
+   * ["<moduleKey>:view", "<moduleKey>:manage"] and linked.
+   */
+  @IsOptional()
+  @IsString()
+  roleId?: string;
 }
