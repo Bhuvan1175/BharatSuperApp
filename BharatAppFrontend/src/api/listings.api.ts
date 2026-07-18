@@ -12,8 +12,10 @@ export interface Listing {
   data: Record<string, unknown> | null;
   cityId: string | null;
   localityId: string | null;
+  wardId: string | null;
   city?: {id: string; name: string} | null;
   locality?: {id: string; name: string} | null;
+  ward?: {id: string; number: string; name: string} | null;
   createdAt: string;
 }
 
@@ -28,6 +30,7 @@ export interface ListingFilters {
   moduleKey?: string;
   localityId?: string;
   cityId?: string;
+  wardId?: string;
   status?: string;
   type?: string;
 }
@@ -42,6 +45,7 @@ export interface CreateListingBody {
   expiresAt?: string;
   cityId?: string;
   localityId?: string;
+  wardId?: string;
   data?: Record<string, unknown>;
 }
 

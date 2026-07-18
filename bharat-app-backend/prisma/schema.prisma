@@ -33,6 +33,11 @@ model User {
   // Module entries this user authored (Water updates, etc.). Optional relation.
   listings Listing[] @relation("ListingCreatedBy")
 
+  // ---- Medicine store domain (added; all optional/defaulted → additive) ----
+  medicinesAdded          Medicine[]        @relation("MedicineCreatedBy")
+  medicineRequestsMade    MedicineRequest[] @relation("MedicineRequestCitizen")
+  medicineRequestsDecided MedicineRequest[] @relation("MedicineRequestDecidedBy")
+
   @@index([roleId])
   @@index([departmentId])
 }
@@ -65,15 +70,26 @@ model Department {
   defaultRoleId String?
   defaultRole   Role?    @relation("DepartmentDefaultRole", fields: [defaultRoleId], references: [id])
   users         User[]
+
+  /// Physical location / contact details for the department's public-facing
+  /// service point (e.g. the Medicine Store's pickup address). All optional —
+  /// most departments won't set these; Medicine surfaces them on both the
+  /// manager dashboard and the citizen-facing medicine page.
+  address      String?
+  latitude     Float?
+  longitude    Float?
+  phone        String?
+  openingHours String?
+
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
   @@index([defaultRoleId])
 }
 
-/// ---- Location hierarchy: State → District → City → Locality ----
+/// ---- Location hierarchy: State → District → City → (Locality | Ward) ----
 /// Shared reference data used by every module. Cascade deletes flow downward,
-/// so removing a State cleans up its Districts → Cities → Localities.
+/// so removing a State cleans up its Districts → Cities → Localities/Wards.
 
 model State {
   id        String     @id @default(cuid())
@@ -89,6 +105,9 @@ model District {
   stateId   String
   state     State    @relation(fields: [stateId], references: [id], onDelete: Cascade)
   cities    City[]
+  // True once villages/cities have been auto-fetched (AI or govt data) for this
+  // district, so the app can show status and avoid needless re-fetching.
+  citiesFetched Boolean @default(false)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -102,7 +121,12 @@ model City {
   districtId String
   district   District   @relation(fields: [districtId], references: [id], onDelete: Cascade)
   localities Locality[]
+  wards      Ward[]
   listings   Listing[]
+  // How this city was created: "manual" | "ai" | "govt".
+  source     String     @default("manual")
+  // True once wards have been auto-fetched for this city (lazy, on first view).
+  wardsFetched Boolean  @default(false)
   createdAt  DateTime   @default(now())
   updatedAt  DateTime   @updatedAt
 
@@ -126,6 +150,24 @@ model Locality {
   @@index([cityId])
 }
 
+/// A structured ward within a city/village — has both a Number and a Name.
+/// Populated automatically (AI or govt data) or entered manually by a manager.
+model Ward {
+  id        String    @id @default(cuid())
+  number    String
+  name      String
+  // How this ward was created: "manual" | "ai" | "govt".
+  source    String    @default("manual")
+  cityId    String
+  city      City      @relation(fields: [cityId], references: [id], onDelete: Cascade)
+  listings  Listing[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@unique([cityId, number])
+  @@index([cityId])
+}
+
 /// A generic module entry — one flexible table serving every department module.
 /// `moduleKey` ties it to a Department/module (e.g. "water"). `type` describes
 /// the kind of entry ("update", "alert", "listing", …). `data` holds any
@@ -145,6 +187,8 @@ model Listing {
   city       City?     @relation(fields: [cityId], references: [id], onDelete: SetNull)
   localityId String?
   locality   Locality? @relation(fields: [localityId], references: [id], onDelete: SetNull)
+  wardId     String?
+  ward       Ward?     @relation(fields: [wardId], references: [id], onDelete: SetNull)
 
   createdById String?
   createdBy   User?    @relation("ListingCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
@@ -155,5 +199,85 @@ model Listing {
   @@index([moduleKey])
   @@index([cityId])
   @@index([localityId])
+  @@index([wardId])
+  @@index([status])
+}
+
+/// ---- Medicine store domain ----
+/// Real inventory + citizen-request workflow for the Medicine department
+/// (MEDICINE_MANAGER), separate from the generic Listing bulletin entries.
+
+/// Lifecycle of a citizen's request for a medicine, from submission to pickup.
+enum RequestStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  READY_FOR_PICKUP
+  COMPLETED
+}
+
+/// One medicine in the store's inventory. Stock status (In Stock / Low Stock /
+/// Out of Stock) is derived from `stockQty` vs `lowStockThreshold`, not stored,
+/// so a single threshold edit can't leave a stale status behind.
+model Medicine {
+  id                String   @id @default(cuid())
+  name              String
+  description       String?
+  /// Dosage strength label, e.g. "250mg", "500mg", "5ml".
+  strength          String?
+  manufacturer      String?
+  /// Batch/lot number for the current stock (from the manufacturer's pack).
+  batchNumber       String?
+  expiryDate        DateTime?
+  /// Unit of sale, e.g. "tablet", "strip", "bottle", "unit".
+  unit              String   @default("unit")
+  price             Float    @default(0)
+  stockQty          Int      @default(0)
+  /// stockQty at or below this (but > 0) is "Low Stock"; 0 is "Out of Stock".
+  lowStockThreshold Int      @default(10)
+  /// Soft-hide from the citizen-facing catalogue without deleting history.
+  isActive          Boolean  @default(true)
+
+  createdById String?
+  createdBy   User?    @relation("MedicineCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  requests MedicineRequest[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([name])
+  @@index([createdById])
+}
+
+/// A citizen's request to collect a quantity of a medicine from the store.
+/// The Medicine Store Dashboard is the source of truth: accepting/completing a
+/// request here is what moves stock and what the citizen sees.
+model MedicineRequest {
+  id     String @id @default(cuid())
+  medicineId   String
+  medicine     Medicine @relation(fields: [medicineId], references: [id], onDelete: Cascade)
+  /// Snapshot of the medicine name at request time (survives renames/deletes).
+  medicineName String
+
+  quantity Int
+  status   RequestStatus @default(PENDING)
+  /// Optional manager note (e.g. reason for rejection).
+  notes    String?
+
+  citizenId   String
+  citizen     User   @relation("MedicineRequestCitizen", fields: [citizenId], references: [id], onDelete: Cascade)
+  /// Snapshot of the citizen's name at request time, for the dashboard list.
+  citizenName String?
+
+  decidedById String?
+  decidedBy   User?     @relation("MedicineRequestDecidedBy", fields: [decidedById], references: [id], onDelete: SetNull)
+  decidedAt   DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([medicineId])
+  @@index([citizenId])
   @@index([status])
 }

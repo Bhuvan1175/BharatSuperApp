@@ -1,5 +1,5 @@
 import React, {useEffect, useState} from 'react';
-import {View, ActivityIndicator} from 'react-native';
+import {View, ActivityIndicator, Linking, Alert, Pressable} from 'react-native';
 import {NativeStackScreenProps} from '@react-navigation/native-stack';
 import {RootStackParamList} from '../../navigation/types';
 import {useTheme} from '../../context/ThemeContext';
@@ -10,8 +10,17 @@ import {Pharmacy, GenericAlternative} from '../../types';
 import {formatPrice, interpolate} from '../../utils/format';
 import {Screen, Header, SearchBar, Card, Button, AppText, Icon, SectionHeader, Badge, FadeInView} from '../../components/common';
 import {PharmacyCard} from '../../components/cards';
+import {useMedicines, useMedicineStore, useCreateMedicineRequest} from '../../hooks/useMedicines';
+import {Medicine} from '../../api/medicines.api';
+import {getApiErrorMessage} from '../../api/errors';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Health'>;
+
+const STOCK_LABEL: Record<string, string> = {
+  IN_STOCK: 'In Stock',
+  LOW_STOCK: 'Low Stock',
+  OUT_OF_STOCK: 'Out of Stock',
+};
 
 const HealthScreen: React.FC<Props> = ({navigation, route}) => {
   const {theme} = useTheme();
@@ -21,6 +30,32 @@ const HealthScreen: React.FC<Props> = ({navigation, route}) => {
   const [pharmacies, setPharmacies] = useState<Pharmacy[]>([]);
   const [generic, setGeneric] = useState<GenericAlternative | null>(null);
   const [loading, setLoading] = useState(false);
+
+  // Real backend: does OUR medicine store actually carry this medicine?
+  const {data: storeMatches} = useMedicines({search: query});
+  const {data: storeInfo} = useMedicineStore();
+  const createRequest = useCreateMedicineRequest();
+  const localMatch = (storeMatches ?? []).find((m: Medicine) =>
+    m.name.toLowerCase().includes(query.trim().toLowerCase()),
+  );
+
+  const requestPickup = () => {
+    if (!localMatch) return;
+    Alert.alert('Request this medicine?', `We'll notify the store to prepare 1 ${localMatch.unit} of ${localMatch.name} for pickup.`, [
+      {text: 'Cancel', style: 'cancel'},
+      {
+        text: 'Request',
+        onPress: () =>
+          createRequest.mutate(
+            {medicineId: localMatch.id, quantity: 1},
+            {
+              onSuccess: () => Alert.alert('Requested', 'The store has been notified.'),
+              onError: e => Alert.alert('Failed', getApiErrorMessage(e)),
+            },
+          ),
+      },
+    ]);
+  };
 
   const search = (q: string) => {
     if (!q.trim()) return;
@@ -44,7 +79,14 @@ const HealthScreen: React.FC<Props> = ({navigation, route}) => {
       <Header
         title={t.health.title}
         onBack={() => navigation.goBack()}
-        right={<Icon name={saved ? 'bookmark' : 'bookmark'} size={20} color={saved ? theme.colors.primary : theme.colors.textMuted} />}
+        right={
+          <View style={{flexDirection: 'row', alignItems: 'center', gap: theme.spacing.md}}>
+            <Pressable onPress={() => navigation.navigate('MedicineReminders', undefined)} hitSlop={8}>
+              <Icon name="bell" size={20} color={theme.colors.textMuted} />
+            </Pressable>
+            <Icon name="bookmark" size={20} color={saved ? theme.colors.primary : theme.colors.textMuted} />
+          </View>
+        }
       />
       <View style={{marginTop: theme.spacing.md}}>
         <SearchBar
@@ -69,6 +111,65 @@ const HealthScreen: React.FC<Props> = ({navigation, route}) => {
         </View>
         <Icon name="chevron-right" size={20} color={theme.colors.textMuted} />
       </Card>
+
+      {/* Our own store — real inventory + pickup location */}
+      {localMatch && storeInfo?.address && (
+        <FadeInView>
+          <Card style={{marginTop: theme.spacing.md, borderColor: theme.colors.primary, borderWidth: 1}}>
+            <View style={{flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center'}}>
+              <View style={{flexDirection: 'row', alignItems: 'center', gap: 6}}>
+                <Icon name="check-circle" size={15} color={theme.colors.primary} />
+                <AppText variant="bodyStrong">Available at your local store</AppText>
+              </View>
+              <Badge
+                label={STOCK_LABEL[localMatch.stockStatus]}
+                color={localMatch.stockStatus === 'OUT_OF_STOCK' ? theme.colors.danger : theme.colors.accent}
+              />
+            </View>
+            <View style={{flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: theme.spacing.sm}}>
+              <AppText variant="body">
+                {localMatch.name}
+                {localMatch.strength ? ` (${localMatch.strength})` : ''}
+              </AppText>
+              <AppText variant="h3" color={theme.colors.primary}>
+                {formatPrice(localMatch.price)}
+              </AppText>
+            </View>
+            <View style={{flexDirection: 'row', alignItems: 'flex-start', gap: 6, marginTop: theme.spacing.sm}}>
+              <Icon name="map-pin" size={13} color={theme.colors.textMuted} />
+              <AppText variant="caption" muted style={{flex: 1}}>
+                {storeInfo.address}
+                {storeInfo.openingHours ? ` · ${storeInfo.openingHours}` : ''}
+              </AppText>
+            </View>
+            <View style={{flexDirection: 'row', gap: theme.spacing.sm, marginTop: theme.spacing.md}}>
+              <Button
+                label={t.common.directions}
+                icon="navigation"
+                variant="outline"
+                size="sm"
+                style={{flex: 1}}
+                onPress={() =>
+                  Linking.openURL(
+                    storeInfo.latitude != null && storeInfo.longitude != null
+                      ? `https://maps.google.com/?q=${storeInfo.latitude},${storeInfo.longitude}`
+                      : `https://maps.google.com/?q=${encodeURIComponent(storeInfo.address ?? '')}`,
+                  )
+                }
+              />
+              <Button
+                label="Request pickup"
+                icon="shopping-bag"
+                size="sm"
+                style={{flex: 1}}
+                disabled={localMatch.stockStatus === 'OUT_OF_STOCK' || createRequest.isPending}
+                loading={createRequest.isPending}
+                onPress={requestPickup}
+              />
+            </View>
+          </Card>
+        </FadeInView>
+      )}
 
       {loading ? (
         <ActivityIndicator color={theme.colors.primary} style={{marginTop: theme.spacing.huge}} />
@@ -97,7 +198,17 @@ const HealthScreen: React.FC<Props> = ({navigation, route}) => {
                     {t.health.dosage}: {generic.dosageNote}
                   </AppText>
                 </View>
-                <Button label={t.health.setReminder} icon="bell" variant="outline" size="sm" style={{marginTop: theme.spacing.md}} onPress={() => toggleSaved('medicines', query)} />
+                <Button
+                  label={t.health.setReminder}
+                  icon="bell"
+                  variant="outline"
+                  size="sm"
+                  style={{marginTop: theme.spacing.md}}
+                  onPress={() => {
+                    toggleSaved('medicines', query);
+                    navigation.navigate('MedicineReminders', {medicine: query});
+                  }}
+                />
               </Card>
             </FadeInView>
           )}

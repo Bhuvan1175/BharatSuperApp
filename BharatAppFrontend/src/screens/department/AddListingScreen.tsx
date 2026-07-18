@@ -5,6 +5,7 @@ import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {RootStackParamList} from '../../navigation/types';
 import {useTheme} from '@context/ThemeContext';
 import {Screen, Header, Input, Button, AppText} from '@components/common';
+import DatePickerField from '../../components/common/DatePickerField';
 import OptionPicker from '../../components/admin/OptionPicker';
 import {getApiErrorMessage} from '../../api/errors';
 import {useAuthStore} from '../../store/authStore';
@@ -13,6 +14,7 @@ import {
   useDistricts,
   useLocalities,
   useStates,
+  useWards,
 } from '../../hooks/useLocations';
 import {
   useCreateListing,
@@ -32,6 +34,52 @@ const STATUS_OPTIONS = [
   {label: 'Archived', value: 'archived'},
 ];
 
+/**
+ * Placeholder examples per department module, so each manager sees hints
+ * relevant to their own module (Add Entry is shared by every department).
+ */
+const MODULE_EXAMPLES: Record<
+  string,
+  {title: string; body: string; timing: string}
+> = {
+  water: {
+    title: 'e.g. Water supply schedule',
+    body: 'e.g. Supply will be available in the morning.',
+    timing: 'e.g. 8:00 AM',
+  },
+  electricity: {
+    title: 'e.g. Scheduled power cut',
+    body: 'e.g. Power will be off for line maintenance.',
+    timing: 'e.g. 2:00 PM – 4:00 PM',
+  },
+  medicine: {
+    title: 'e.g. Medicine stock update',
+    body: 'e.g. Paracetamol is back in stock at the PHC.',
+    timing: 'e.g. 10:00 AM',
+  },
+  fuel: {
+    title: 'e.g. Fuel availability update',
+    body: 'e.g. Petrol available; diesel limited today.',
+    timing: 'e.g. 9:00 AM',
+  },
+  scheme: {
+    title: 'e.g. New scheme announcement',
+    body: 'e.g. Applications are open until month end.',
+    timing: '',
+  },
+  area: {
+    title: 'e.g. Area notice',
+    body: 'e.g. Road repair work in progress near the market.',
+    timing: '',
+  },
+};
+
+const DEFAULT_EXAMPLE = {
+  title: 'e.g. Update title',
+  body: 'e.g. A short message for citizens.',
+  timing: 'e.g. 8:00 AM',
+};
+
 const AddListingScreen: React.FC = () => {
   const {theme} = useTheme();
   const navigation = useNavigation<Nav>();
@@ -41,6 +89,7 @@ const AddListingScreen: React.FC = () => {
 
   const department = useAuthStore(s => s.department);
   const moduleKey = department?.moduleKey ?? '';
+  const ex = MODULE_EXAMPLES[moduleKey] ?? DEFAULT_EXAMPLE;
 
   const {data: existing} = useListing(listingId);
   const createListing = useCreateListing();
@@ -49,19 +98,22 @@ const AddListingScreen: React.FC = () => {
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
   const [timing, setTiming] = useState('');
+  const [date, setDate] = useState<string | undefined>(); // ISO yyyy-mm-dd
   const [type, setType] = useState('update');
   const [status, setStatus] = useState('active');
 
-  // Location cascade
+  // Location cascade: State → District → City/Village → Ward (+ optional Locality)
   const [stateId, setStateId] = useState<string | undefined>();
   const [districtId, setDistrictId] = useState<string | undefined>();
   const [cityId, setCityId] = useState<string | undefined>();
+  const [wardId, setWardId] = useState<string | undefined>();
   const [localityId, setLocalityId] = useState<string | undefined>();
   const [locQuery, setLocQuery] = useState('');
 
   const {data: states} = useStates();
   const {data: districts} = useDistricts(stateId);
   const {data: cities} = useCities(districtId);
+  const {data: wards, isLoading: wardsLoading} = useWards(cityId);
   const {data: localities} = useLocalities(cityId);
 
   // Prefill on edit (location stays as-is unless the user re-picks via cascade).
@@ -71,8 +123,9 @@ const AddListingScreen: React.FC = () => {
     setBody(existing.body ?? '');
     setType(existing.type ?? 'update');
     setStatus(existing.status ?? 'active');
-    const t = (existing.data as {timing?: string} | null)?.timing;
-    if (typeof t === 'string') setTiming(t);
+    const extras = existing.data as {timing?: string; date?: string} | null;
+    if (typeof extras?.timing === 'string') setTiming(extras.timing);
+    if (typeof extras?.date === 'string') setDate(extras.date);
   }, [existing]);
 
   const stateOptions = useMemo(
@@ -87,6 +140,17 @@ const AddListingScreen: React.FC = () => {
     () => (cities ?? []).map(c => ({label: c.name, value: c.id})),
     [cities],
   );
+  // Ward Number and Ward Name are two views of the same ward list — both map to
+  // the ward id, so picking either one selects the ward and highlights the
+  // matching option in the other picker.
+  const wardNumberOptions = useMemo(
+    () => (wards ?? []).map(w => ({label: `Ward ${w.number}`, value: w.id})),
+    [wards],
+  );
+  const wardNameOptions = useMemo(
+    () => (wards ?? []).map(w => ({label: w.name, value: w.id})),
+    [wards],
+  );
   const filteredLocalities = useMemo(() => {
     const q = locQuery.trim().toLowerCase();
     const list = localities ?? [];
@@ -95,8 +159,9 @@ const AddListingScreen: React.FC = () => {
 
   const busy = createListing.isPending || updateListing.isPending;
 
-  const currentLocationLabel =
-    existing?.locality?.name ?? existing?.city?.name ?? 'All areas';
+  const currentLocationLabel = existing?.ward
+    ? `Ward ${existing.ward.number} — ${existing.ward.name}`
+    : existing?.locality?.name ?? existing?.city?.name ?? 'All areas';
 
   const onSave = () => {
     if (!moduleKey) {
@@ -107,15 +172,22 @@ const AddListingScreen: React.FC = () => {
       Alert.alert('Title required', 'Please enter a title.');
       return;
     }
-    const data = timing.trim() ? {timing: timing.trim()} : undefined;
+    const extras: Record<string, string> = {};
+    if (timing.trim()) extras.timing = timing.trim();
+    if (date) extras.date = date;
+    // On edit, send an (empty) object so clearing the date/timing persists;
+    // on create, omit it entirely.
+    const data = Object.keys(extras).length ? extras : isEdit ? {} : undefined;
 
     // Only send a location if the user picked one in the cascade this time.
-    const locationPatch: {cityId?: string; localityId?: string} = {};
-    if (localityId) {
-      locationPatch.localityId = localityId;
-    } else if (cityId) {
-      locationPatch.cityId = cityId;
-    }
+    const locationPatch: {
+      cityId?: string;
+      wardId?: string;
+      localityId?: string;
+    } = {};
+    if (cityId) locationPatch.cityId = cityId;
+    if (wardId) locationPatch.wardId = wardId;
+    if (localityId) locationPatch.localityId = localityId;
 
     if (isEdit && listingId) {
       updateListing.mutate(
@@ -178,7 +250,7 @@ const AddListingScreen: React.FC = () => {
         icon="type"
         value={title}
         onChangeText={setTitle}
-        placeholder="e.g. Water supply schedule"
+        placeholder={ex.title}
         containerStyle={{marginTop: theme.spacing.md, marginBottom: theme.spacing.lg}}
       />
       <Input
@@ -186,22 +258,29 @@ const AddListingScreen: React.FC = () => {
         icon="align-left"
         value={body}
         onChangeText={setBody}
-        placeholder="e.g. Supply will be available in the morning."
+        placeholder={ex.body}
         multiline
         containerStyle={{marginBottom: theme.spacing.lg}}
       />
+      <DatePickerField
+        label="Date this applies to (optional)"
+        value={date}
+        onChange={setDate}
+        placeholder="e.g. the day supply stops"
+      />
+
       <Input
         label="Timing (optional)"
         icon="clock"
         value={timing}
         onChangeText={setTiming}
-        placeholder="e.g. 8:00 AM"
+        placeholder={ex.timing}
         containerStyle={{marginBottom: theme.spacing.lg}}
       />
 
       <OptionPicker label="Type" value={type} onChange={setType} options={TYPE_OPTIONS} />
 
-      {/* Location cascade: State → District → City → Locality */}
+      {/* Location cascade: State → District → City/Village → Ward */}
       <OptionPicker
         label="State"
         value={stateId}
@@ -209,6 +288,7 @@ const AddListingScreen: React.FC = () => {
           setStateId(v);
           setDistrictId(undefined);
           setCityId(undefined);
+          setWardId(undefined);
           setLocalityId(undefined);
         }}
         options={stateOptions}
@@ -226,6 +306,7 @@ const AddListingScreen: React.FC = () => {
           onChange={v => {
             setDistrictId(v);
             setCityId(undefined);
+            setWardId(undefined);
             setLocalityId(undefined);
           }}
           options={districtOptions}
@@ -234,10 +315,11 @@ const AddListingScreen: React.FC = () => {
 
       {!!districtId && (
         <OptionPicker
-          label="City / town"
+          label="City / village"
           value={cityId}
           onChange={v => {
             setCityId(v);
+            setWardId(undefined);
             setLocalityId(undefined);
             setLocQuery('');
           }}
@@ -245,11 +327,41 @@ const AddListingScreen: React.FC = () => {
         />
       )}
 
-      {/* Locality with type-to-filter (optional — leave empty for city-wide) */}
+      {/* Ward Number + Ward Name — auto-populated once a village is picked. */}
+      {!!cityId && (
+        <>
+          {wardsLoading ? (
+            <AppText variant="caption" muted style={{marginBottom: theme.spacing.md}}>
+              Fetching wards…
+            </AppText>
+          ) : wards && wards.length ? (
+            <>
+              <OptionPicker
+                label="Ward number"
+                value={wardId}
+                onChange={setWardId}
+                options={wardNumberOptions}
+              />
+              <OptionPicker
+                label="Ward name"
+                value={wardId}
+                onChange={setWardId}
+                options={wardNameOptions}
+              />
+            </>
+          ) : (
+            <AppText variant="caption" muted style={{marginBottom: theme.spacing.md}}>
+              No wards for this village yet — add them from "Areas & Settings".
+            </AppText>
+          )}
+        </>
+      )}
+
+      {/* Locality with type-to-filter (optional — leave empty for city/ward-wide) */}
       {!!cityId && (
         <View style={{marginBottom: theme.spacing.lg}}>
           <AppText variant="label" muted style={{marginBottom: theme.spacing.sm}}>
-            Area / locality (optional — leave empty for city-wide)
+            Area / locality (optional)
           </AppText>
           <Input
             icon="search"

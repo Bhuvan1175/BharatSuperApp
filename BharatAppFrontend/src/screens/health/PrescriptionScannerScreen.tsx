@@ -4,24 +4,47 @@ import {NativeStackScreenProps} from '@react-navigation/native-stack';
 import {RootStackParamList} from '../../navigation/types';
 import {useTheme} from '../../context/ThemeContext';
 import {useTranslation} from '../../hooks/useTranslation';
-import {healthService} from '../../services/healthService';
-import {Screen, Header, Card, Button, AppText, Icon} from '../../components/common';
+import {healthService, OCR_CONFIDENCE_THRESHOLD} from '../../services/healthService';
+import {OcrMedicineMatch} from '../../types';
+import {Screen, Header, Card, Button, AppText, Icon, Input, Badge} from '../../components/common';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'PrescriptionScanner'>;
+
+/** A detected medicine plus local UI state for the confirm-if-unsure flow. */
+interface DetectedMed extends OcrMedicineMatch {
+  /** User-edited name, if they changed it during confirmation. */
+  editedName: string;
+  /** Uncertain reads must be explicitly confirmed before they're searchable. */
+  confirmed: boolean;
+}
 
 const PrescriptionScannerScreen: React.FC<Props> = ({navigation}) => {
   const {theme} = useTheme();
   const {t} = useTranslation();
   const [scanning, setScanning] = useState(false);
-  const [meds, setMeds] = useState<string[]>([]);
+  const [meds, setMeds] = useState<DetectedMed[]>([]);
 
   const scan = () => {
     setScanning(true);
     setMeds([]);
-    healthService.scanPrescription().then(m => {
-      setMeds(m);
+    healthService.scanPrescription().then(matches => {
+      setMeds(
+        matches.map(m => ({
+          ...m,
+          editedName: m.name,
+          confirmed: m.confidence >= OCR_CONFIDENCE_THRESHOLD,
+        })),
+      );
       setScanning(false);
     });
+  };
+
+  const updateName = (index: number, name: string) => {
+    setMeds(prev => prev.map((m, i) => (i === index ? {...m, editedName: name} : m)));
+  };
+
+  const confirmMed = (index: number) => {
+    setMeds(prev => prev.map((m, i) => (i === index ? {...m, confirmed: true} : m)));
   };
 
   return (
@@ -59,19 +82,44 @@ const PrescriptionScannerScreen: React.FC<Props> = ({navigation}) => {
         <View style={{marginTop: theme.spacing.xl}}>
           <AppText variant="h3">Detected medicines</AppText>
           <AppText variant="caption" muted style={{marginBottom: theme.spacing.md}}>
-            Tap to find nearby. If a name looks wrong, edit it.
+            Tap a confirmed medicine to find it nearby. Uncertain reads need a quick confirm.
           </AppText>
-          {meds.map(m => (
-            <Pressable key={m} onPress={() => navigation.navigate('Health', {medicine: m})}>
-              <Card style={{flexDirection: 'row', alignItems: 'center', gap: theme.spacing.md, marginBottom: theme.spacing.sm}}>
-                <Icon name="check-circle" size={20} color={theme.colors.accent} />
-                <AppText variant="body" style={{flex: 1}}>
-                  {m}
-                </AppText>
-                <Icon name="search" size={18} color={theme.colors.textMuted} />
+          {meds.map((m, i) =>
+            m.confirmed ? (
+              <Pressable key={i} onPress={() => navigation.navigate('Health', {medicine: m.editedName})}>
+                <Card style={{flexDirection: 'row', alignItems: 'center', gap: theme.spacing.md, marginBottom: theme.spacing.sm}}>
+                  <Icon name="check-circle" size={20} color={theme.colors.accent} />
+                  <AppText variant="body" style={{flex: 1}}>
+                    {m.editedName}
+                  </AppText>
+                  <Icon name="search" size={18} color={theme.colors.textMuted} />
+                </Card>
+              </Pressable>
+            ) : (
+              <Card key={i} style={{marginBottom: theme.spacing.sm, borderColor: theme.colors.warning, borderWidth: 1}}>
+                <View style={{flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm, marginBottom: theme.spacing.sm}}>
+                  <Icon name="alert-triangle" size={16} color={theme.colors.warning} />
+                  <AppText variant="bodyStrong" style={{flex: 1}}>
+                    Not sure about this one
+                  </AppText>
+                  <Badge label={`${Math.round(m.confidence * 100)}% match`} color={theme.colors.warning} />
+                </View>
+                <Input
+                  value={m.editedName}
+                  onChangeText={name => updateName(i, name)}
+                  placeholder="Edit the medicine name"
+                  containerStyle={{marginBottom: theme.spacing.sm}}
+                />
+                <Button
+                  label="Confirm"
+                  icon="check"
+                  size="sm"
+                  disabled={!m.editedName.trim()}
+                  onPress={() => confirmMed(i)}
+                />
               </Card>
-            </Pressable>
-          ))}
+            ),
+          )}
         </View>
       )}
     </Screen>

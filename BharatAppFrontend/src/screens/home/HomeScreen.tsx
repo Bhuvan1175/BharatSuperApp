@@ -1,4 +1,4 @@
-import React, {useEffect, useState} from 'react';
+import React from 'react';
 import {View, ScrollView, Pressable} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {useNavigation} from '@react-navigation/native';
@@ -10,8 +10,7 @@ import {useAppData} from '../../context/AppDataContext';
 import {useTranslation} from '../../hooks/useTranslation';
 import {useRotatingText} from '../../hooks/useRotatingText';
 import {QUICK_ACTIONS} from '../../constants/quickActions';
-import {alertsService} from '../../services/alertsService';
-import {LocalAlert} from '../../types';
+import {usePublicAlerts} from '../../hooks/useListings';
 import {useAuthStore} from '../../store/authStore';
 import {
   AppText,
@@ -22,7 +21,7 @@ import {
   Icon,
   FadeInView,
 } from '../../components/common';
-import {AlertCard} from '../../components/cards';
+import {ModuleAlertCard} from '../../components/cards';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
@@ -33,14 +32,13 @@ const HomeScreen: React.FC = () => {
   const {recents, addRecent} = useAppData();
   const navigation = useNavigation<Nav>();
   const placeholder = useRotatingText(t.home.searchPlaceholders);
-  const [alerts, setAlerts] = useState<LocalAlert[]>([]);
+
+  // Live alerts from every department (Water, Electricity, …). The backend
+  // returns only "active" alerts to citizens.
+  const {data: alerts, isLoading: alertsLoading} = usePublicAlerts();
 
   // Prefer first name, then username, then a friendly fallback.
   const greetingName = user?.name?.split(' ')[0] ?? user?.username ?? 'there';
-
-  useEffect(() => {
-    alertsService.getAlerts().then(setAlerts);
-  }, []);
 
   const openChat = (query?: string) => {
     if (query) addRecent(query);
@@ -131,20 +129,28 @@ const HomeScreen: React.FC = () => {
           )}
         </View>
 
-        {/* Local alerts */}
+        {/* Local alerts — live from every department */}
         <View style={{marginTop: theme.spacing.xxl, paddingHorizontal: theme.spacing.lg}}>
-          <SectionHeader title={t.home.localAlerts} actionLabel={t.common.viewAll} onAction={() => navigateTo('Utilities')} />
+          <SectionHeader title={t.home.localAlerts} actionLabel={t.common.viewAll} onAction={() => navigateTo('LocalAlerts')} />
         </View>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{paddingHorizontal: theme.spacing.lg}}>
-          {alerts.map((a, i) => (
-            <FadeInView key={a.id} delay={i * 60}>
-              <AlertCard alert={a} onPress={() => navigateTo('Utilities')} />
-            </FadeInView>
-          ))}
-        </ScrollView>
+        {alerts && alerts.length > 0 ? (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{paddingHorizontal: theme.spacing.lg}}>
+            {alerts.map((a, i) => (
+              <FadeInView key={a.id} delay={i * 60}>
+                <ModuleAlertCard alert={a} onPress={() => navigateTo('LocalAlerts')} />
+              </FadeInView>
+            ))}
+          </ScrollView>
+        ) : (
+          <View style={{paddingHorizontal: theme.spacing.lg}}>
+            <AppText variant="caption" muted>
+              {alertsLoading ? 'Loading alerts…' : 'No alerts right now — you’re all caught up.'}
+            </AppText>
+          </View>
+        )}
       </ScrollView>
     </SafeAreaView>
   );

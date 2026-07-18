@@ -125,6 +125,14 @@ export interface GenericAlternative {
   dosageNote: string;
 }
 
+/** One medicine name extracted from a scanned prescription (OCR). */
+export interface OcrMedicineMatch {
+  name: string;
+  /** 0–1 confidence from the OCR model. Below the "unsure" threshold, the UI
+   * asks the user to confirm/edit the name before searching. */
+  confidence: number;
+}
+
 /* ---------- Government ---------- */
 export type SchemeCategory =
   | 'Scholarships'

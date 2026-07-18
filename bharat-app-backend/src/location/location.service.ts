@@ -13,6 +13,8 @@ import {
   CreateStateDto,
 } from './dto/city.dto';
 import { BulkNamesDto, CreateLocalityDto } from './dto/locality.dto';
+import { CreateWardDto } from './dto/ward.dto';
+import { LocationDataService } from './providers/location-data.service';
 
 type Suggestion = {
   source: 'openai' | 'none';
@@ -20,14 +22,29 @@ type Suggestion = {
   message: string;
 };
 
+/** A city joined with its district + state names, for provider context. */
+type CityWithParents = Prisma.CityGetPayload<{
+  include: { district: { include: { state: true } } };
+}>;
+
 /**
- * Location hierarchy: State → District → City → Locality. Shared reference data
- * for every module. Reads are open to any authenticated user; writes are
- * manager-only (any user holding a "<module>:manage" permission, or "*").
+ * Location hierarchy: State → District → City → (Locality | Ward). Shared
+ * reference data for every module. Reads are open to any authenticated user;
+ * writes are manager-only (any user holding a "<module>:manage" permission,
+ * or "*").
+ *
+ * Auto-fill: when a district is created, its villages/cities are fetched and
+ * saved automatically (best-effort, via LocationDataService). Wards are fetched
+ * lazily the first time a city's ward list is requested — so we never fire
+ * hundreds of provider calls up front, yet the ward dropdown still populates on
+ * its own the moment a manager opens a village.
  */
 @Injectable()
 export class LocationService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly locationData: LocationDataService,
+  ) {}
 
   private assertManager(user: AuthUser) {
     const perms = user?.permissions ?? [];
@@ -92,13 +109,16 @@ export class LocationService {
     this.assertManager(user);
     const state = await this.prisma.state.findUnique({ where: { id: stateId } });
     if (!state) throw new NotFoundException('State not found');
-    try {
-      return await this.prisma.district.create({
-        data: { stateId, name: dto.name.trim() },
-      });
-    } catch (e) {
-      this.conflict(e, 'district');
-    }
+    const district = await this.prisma.district
+      .create({ data: { stateId, name: dto.name.trim() } })
+      .catch((e) => this.conflict(e, 'district'));
+    // Fully automatic, but fire-and-forget: villages fetch & save in the
+    // background so the request returns immediately (an AI call can take several
+    // seconds — longer than the mobile client's 15s timeout for a big district).
+    // The app refreshes the village list shortly after. Best-effort; never
+    // blocks or fails district creation.
+    void this.autoFetchCities(district.id, district.name, state.name);
+    return district;
   }
 
   async bulkDistricts(user: AuthUser, stateId: string, dto: BulkNamesDto) {
@@ -121,6 +141,32 @@ export class LocationService {
     return { success: true, message: `District "${district.name}" deleted` };
   }
 
+  /**
+   * Re-run village auto-fetch for an existing district (e.g. one created before
+   * auto-fill existed, or to pick up more). Returns how many NEW villages were
+   * added.
+   */
+  async refetchCities(user: AuthUser, districtId: string) {
+    this.assertManager(user);
+    const district = await this.prisma.district.findUnique({
+      where: { id: districtId },
+      include: { state: true },
+    });
+    if (!district) throw new NotFoundException('District not found');
+    if (!this.locationData.isConfigured()) {
+      return {
+        added: 0,
+        message:
+          'Auto-fetch is off. Set OPENAI_API_KEY (or a data provider) on the backend.',
+      };
+    }
+    const before = await this.prisma.city.count({ where: { districtId } });
+    await this.autoFetchCities(district.id, district.name, district.state.name);
+    const after = await this.prisma.city.count({ where: { districtId } });
+    const added = after - before;
+    return { added, message: `Added ${added} new village(s).` };
+  }
+
   async suggestDistricts(user: AuthUser, stateId: string): Promise<Suggestion> {
     this.assertManager(user);
     const state = await this.prisma.state.findUnique({ where: { id: stateId } });
@@ -140,7 +186,7 @@ export class LocationService {
     return this.prisma.city.findMany({
       where: { districtId },
       orderBy: [{ name: 'asc' }],
-      include: { _count: { select: { localities: true } } },
+      include: { _count: { select: { localities: true, wards: true } } },
     });
   }
 
@@ -152,7 +198,7 @@ export class LocationService {
     if (!district) throw new NotFoundException('District not found');
     try {
       return await this.prisma.city.create({
-        data: { districtId, name: dto.name.trim() },
+        data: { districtId, name: dto.name.trim(), source: 'manual' },
       });
     } catch (e) {
       this.conflict(e, 'city');
@@ -167,7 +213,7 @@ export class LocationService {
     if (!district) throw new NotFoundException('District not found');
     const names = this.cleanNames(dto.names);
     const res = await this.prisma.city.createMany({
-      data: names.map((name) => ({ districtId, name })),
+      data: names.map((name) => ({ districtId, name, source: 'manual' })),
       skipDuplicates: true,
     });
     return { added: res.count };
@@ -191,6 +237,84 @@ export class LocationService {
     return this.suggestNames(
       `List up to 40 cities and towns in ${district.name} district, ${district.state.name}, India.`,
     );
+  }
+
+  /* ------------------------------- Wards ------------------------------- */
+
+  /**
+   * List a city's wards. On first access (wardsFetched === false) this fetches
+   * and saves them automatically from the active provider, so the ward dropdown
+   * populates on its own. Ordered numerically by ward number.
+   */
+  async listWards(cityId: string) {
+    const city = await this.prisma.city.findUnique({
+      where: { id: cityId },
+      include: { district: { include: { state: true } } },
+    });
+    if (!city) throw new NotFoundException('City not found');
+
+    if (!city.wardsFetched && this.locationData.isConfigured()) {
+      await this.autoFetchWards(city);
+    }
+
+    const wards = await this.prisma.ward.findMany({ where: { cityId } });
+    return wards.sort((a, b) => {
+      const na = parseInt(a.number, 10);
+      const nb = parseInt(b.number, 10);
+      if (!isNaN(na) && !isNaN(nb) && na !== nb) return na - nb;
+      return a.number.localeCompare(b.number);
+    });
+  }
+
+  async createWard(user: AuthUser, cityId: string, dto: CreateWardDto) {
+    this.assertManager(user);
+    const city = await this.prisma.city.findUnique({ where: { id: cityId } });
+    if (!city) throw new NotFoundException('City not found');
+    try {
+      return await this.prisma.ward.create({
+        data: {
+          cityId,
+          number: dto.number.trim(),
+          name: dto.name.trim(),
+          source: 'manual',
+        },
+      });
+    } catch (e) {
+      this.conflict(e, 'ward');
+    }
+  }
+
+  async deleteWard(user: AuthUser, id: string) {
+    this.assertManager(user);
+    const ward = await this.prisma.ward.findUnique({ where: { id } });
+    if (!ward) throw new NotFoundException('Ward not found');
+    await this.prisma.ward.delete({ where: { id } });
+    return {
+      success: true,
+      message: `Ward "${ward.number} — ${ward.name}" deleted`,
+    };
+  }
+
+  /** Force a fresh ward auto-fetch for a city. Returns how many NEW were added. */
+  async refetchWards(user: AuthUser, cityId: string) {
+    this.assertManager(user);
+    const city = await this.prisma.city.findUnique({
+      where: { id: cityId },
+      include: { district: { include: { state: true } } },
+    });
+    if (!city) throw new NotFoundException('City not found');
+    if (!this.locationData.isConfigured()) {
+      return {
+        added: 0,
+        message:
+          'Auto-fetch is off. Set OPENAI_API_KEY (or a data provider) on the backend.',
+      };
+    }
+    const before = await this.prisma.ward.count({ where: { cityId } });
+    await this.autoFetchWards(city);
+    const after = await this.prisma.ward.count({ where: { cityId } });
+    const added = after - before;
+    return { added, message: `Added ${added} new ward(s).` };
   }
 
   /* ---------------------------- Localities ----------------------------- */
@@ -254,11 +378,78 @@ export class LocationService {
     );
   }
 
-  /* -------------------------- AI helpers ------------------------------- */
+  /* --------------------------- Auto-fetch ------------------------------ */
 
+  /** Whether auto-fill is available, and which provider is active. */
   aiStatus() {
-    return { enabled: !!process.env.OPENAI_API_KEY };
+    return {
+      enabled: this.locationData.isConfigured(),
+      provider: this.locationData.activeProviderName(),
+      wardsAuto: this.locationData.wardsAutoAvailable(),
+    };
   }
+
+  /** Fetch & save a district's villages. Best-effort — never throws. */
+  private async autoFetchCities(
+    districtId: string,
+    districtName: string,
+    stateName: string,
+  ): Promise<void> {
+    if (!this.locationData.isConfigured()) return;
+    try {
+      const villages = await this.locationData.fetchVillages({
+        state: stateName,
+        district: districtName,
+      });
+      const names = this.cleanNames(villages.map((v) => v.name));
+      if (names.length) {
+        await this.prisma.city.createMany({
+          data: names.map((name) => ({
+            districtId,
+            name,
+            source: this.locationData.activeProviderName(),
+          })),
+          skipDuplicates: true,
+        });
+      }
+      await this.prisma.district.update({
+        where: { id: districtId },
+        data: { citiesFetched: true },
+      });
+    } catch {
+      // Best-effort: manual entry still works even if the provider fails.
+    }
+  }
+
+  /** Fetch & save a city's wards. Best-effort — never throws. */
+  private async autoFetchWards(city: CityWithParents): Promise<void> {
+    try {
+      const wards = await this.locationData.fetchWards({
+        state: city.district.state.name,
+        district: city.district.name,
+        city: city.name,
+      });
+      if (wards.length) {
+        await this.prisma.ward.createMany({
+          data: wards.map((w) => ({
+            cityId: city.id,
+            number: w.number,
+            name: w.name,
+            source: this.locationData.activeProviderName(),
+          })),
+          skipDuplicates: true,
+        });
+      }
+      await this.prisma.city.update({
+        where: { id: city.id },
+        data: { wardsFetched: true },
+      });
+    } catch {
+      // Best-effort.
+    }
+  }
+
+  /* -------------------------- AI helpers ------------------------------- */
 
   private cleanNames(names: string[]): string[] {
     return Array.from(new Set(names.map((n) => n.trim()).filter(Boolean)));
@@ -268,7 +459,7 @@ export class LocationService {
    * Ask OpenAI for a JSON list of place names (optional). Only RETURNS names —
    * the manager reviews and saves them. Without OPENAI_API_KEY (or on any
    * error) returns an empty list with a helpful message, so manual entry always
-   * works.
+   * works. Used by the "Suggest with AI" buttons.
    */
   private async suggestNames(prompt: string): Promise<Suggestion> {
     const apiKey = process.env.OPENAI_API_KEY;

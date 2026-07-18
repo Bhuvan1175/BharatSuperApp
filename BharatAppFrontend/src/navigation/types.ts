@@ -31,6 +31,8 @@ export type RootStackParamList = {
   Saved: undefined;
   EditProfile: undefined;
   UserSearch: undefined;
+  // Citizen: full live alerts feed (Home → Local Alerts → View all).
+  LocalAlerts: undefined;
   // Shared account hub for managers / admin (edit profile · settings · logout).
   Account: undefined;
   // ---- Super Admin panel ----
@@ -47,6 +49,12 @@ export type RootStackParamList = {
   DeptManageEntries: undefined;
   DeptReports: undefined;
   DeptLocalities: undefined;
+  // ---- Medicine Store Dashboard (bespoke — real inventory + requests) ----
+  MedicineInventory: undefined;
+  AddMedicine: {medicineId?: string} | undefined;
+  MedicineRequests: undefined;
+  StoreLocation: undefined;
+  MedicineReminders: {medicine?: string} | undefined;
 };
 
 /** Deep-link targets emitted by AI actions / quick actions. */

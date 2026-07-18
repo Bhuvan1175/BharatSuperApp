@@ -18,3 +18,4 @@ export {default as MapPreview} from './MapPreview';
 export {default as ListRow} from './ListRow';
 export {default as Divider} from './Divider';
 export {default as FadeInView} from './FadeInView';
+export {default as TimePickerField} from './TimePickerField';

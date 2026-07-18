@@ -13,6 +13,7 @@ import {
   Button,
   EmptyState,
 } from '@components/common';
+import {formatDate} from '../../components/common/DatePickerField';
 import {getApiErrorMessage} from '../../api/errors';
 import {useAuthStore} from '../../store/authStore';
 import {useDeleteListing, useListings} from '../../hooks/useListings';
@@ -65,33 +66,41 @@ const ManageEntriesScreen: React.FC = () => {
     ]);
   };
 
-  const renderItem = (item: Listing) => (
-    <Card
-      key={item.id}
-      style={{
-        marginBottom: theme.spacing.md,
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: theme.spacing.md,
-      }}>
-      <Pressable
-        style={{flex: 1}}
-        onPress={() =>
-          navigation.navigate('DeptAddListing', {listingId: item.id})
-        }>
-        <AppText variant="title" numberOfLines={1}>
-          {item.title}
-        </AppText>
-        <AppText variant="caption" muted numberOfLines={1}>
-          {item.locality?.name ?? item.city?.name ?? 'All areas'} · {item.type}
-        </AppText>
-      </Pressable>
-      <StatusBadge status={item.status} />
-      <Pressable onPress={() => onDelete(item)} hitSlop={8}>
-        <Icon name="trash-2" size={18} color={theme.colors.danger} />
-      </Pressable>
-    </Card>
-  );
+  const renderItem = (item: Listing) => {
+    const area = item.ward
+      ? `Ward ${item.ward.number} — ${item.ward.name}`
+      : item.locality?.name ?? item.city?.name ?? 'All areas';
+    const applyDate = formatDate((item.data as {date?: string} | null)?.date);
+
+    return (
+      <Card
+        key={item.id}
+        style={{
+          marginBottom: theme.spacing.md,
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: theme.spacing.md,
+        }}>
+        <Pressable
+          style={{flex: 1}}
+          onPress={() =>
+            navigation.navigate('DeptAddListing', {listingId: item.id})
+          }>
+          <AppText variant="title" numberOfLines={1}>
+            {item.title}
+          </AppText>
+          <AppText variant="caption" muted numberOfLines={1}>
+            {applyDate ? `${applyDate} · ` : ''}
+            {area} · {item.type}
+          </AppText>
+        </Pressable>
+        <StatusBadge status={item.status} />
+        <Pressable onPress={() => onDelete(item)} hitSlop={8}>
+          <Icon name="trash-2" size={18} color={theme.colors.danger} />
+        </Pressable>
+      </Card>
+    );
+  };
 
   return (
     <Screen scroll padded>
