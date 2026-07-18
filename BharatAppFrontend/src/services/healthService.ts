@@ -1,22 +1,14 @@
-import {apiRequest} from './apiClient';
-import {PHARMACIES, getGeneric} from '../data/pharmacies';
-import {Pharmacy, GenericAlternative} from '../types';
-
-export const healthService = {
-  /** GET /health/medicine */
-  findMedicine: (name: string): Promise<Pharmacy[]> =>
-    apiRequest(`/health/medicine?name=${encodeURIComponent(name)}`, () =>
-      PHARMACIES.filter(p =>
-        p.stock.some(s => s.medicine.toLowerCase().includes(name.toLowerCase())) ||
-        name.trim().length === 0,
-      ),
-    ),
-  genericFor: (name: string): Promise<GenericAlternative> =>
-    apiRequest('/health/generic', () => getGeneric(name)),
-  /** POST /health/prescription — OCR stub */
-  scanPrescription: (): Promise<string[]> =>
-    apiRequest('/health/prescription', () => ['Dolo 650', 'Azithromycin 500', 'Vitamin D3'], {
-      method: 'POST',
-      latencyMs: 1600,
-    }),
-};
+/**
+ * NOTE: the mock `findMedicine`/`genericFor` methods that used to live here
+ * (backed by data/pharmacies.ts fake multi-pharmacy data) have been removed.
+ * The Health screen now searches the real Medicine Store catalogue directly
+ * via useMedicines()/useMedicineStore() (src/hooks/useMedicines.ts) — there's
+ * only one real store in this app's data model, not a pharmacy comparison.
+ *
+ * Prescription scanning has moved to services/prescriptionOcr.ts (real
+ * on-device OCR + matching against the real catalogue, not a mock).
+ *
+ * data/pharmacies.ts itself is still used — by the AI chat demo
+ * (services/aiService.ts) — so it hasn't been deleted.
+ */
+export {};

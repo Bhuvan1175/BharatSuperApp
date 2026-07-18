@@ -57,6 +57,10 @@ export class CreateListingDto {
   @IsString()
   localityId?: string;
 
+  @IsOptional()
+  @IsString()
+  wardId?: string;
+
   /** Module-specific extras (e.g. { timing: "8:00 AM" }). */
   @IsOptional()
   @IsObject()
@@ -100,6 +104,10 @@ export class UpdateListingDto {
   localityId?: string;
 
   @IsOptional()
+  @IsString()
+  wardId?: string;
+
+  @IsOptional()
   @IsObject()
   data?: Record<string, unknown>;
 }
@@ -117,6 +125,10 @@ export class QueryListingsDto {
   @IsOptional()
   @IsString()
   cityId?: string;
+
+  @IsOptional()
+  @IsString()
+  wardId?: string;
 
   @IsOptional()
   @IsString()

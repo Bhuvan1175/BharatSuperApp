@@ -14,6 +14,7 @@ import {ThemeProvider, useTheme} from '@context/ThemeContext';
 import {LanguageProvider} from '@context/LanguageContext';
 import {AuthProvider} from '@context/AuthContext';
 import {AppDataProvider} from '@context/AppDataContext';
+import {RemindersProvider} from '@context/RemindersContext';
 import RootNavigator from '@navigation/RootNavigator';
 import {queryClient} from '@/api/queryClient';
 
@@ -41,8 +42,10 @@ const App: React.FC = () => {
             <LanguageProvider>
               <AuthProvider>
                 <AppDataProvider>
-                  <ThemedStatusBar />
-                  <RootNavigator />
+                  <RemindersProvider>
+                    <ThemedStatusBar />
+                    <RootNavigator />
+                  </RemindersProvider>
                 </AppDataProvider>
               </AuthProvider>
             </LanguageProvider>

@@ -17,9 +17,10 @@ import {
   CreateStateDto,
 } from './dto/city.dto';
 import { BulkNamesDto, CreateLocalityDto } from './dto/locality.dto';
+import { CreateWardDto } from './dto/ward.dto';
 
 /**
- * Location hierarchy — State → District → City → Locality.
+ * Location hierarchy — State → District → City → (Locality | Ward).
  * All routes require a logged-in user (JwtAuthGuard). Reads are open; writes are
  * enforced manager-only inside the service.
  */
@@ -28,7 +29,7 @@ import { BulkNamesDto, CreateLocalityDto } from './dto/locality.dto';
 export class LocationController {
   constructor(private readonly locationService: LocationService) {}
 
-  /** Whether AI suggestions are enabled on the backend (OpenAI key present). */
+  /** Whether auto-fill is enabled on the backend, and the active provider. */
   @Get('ai-status')
   aiStatus() {
     return this.locationService.aiStatus();
@@ -113,9 +114,42 @@ export class LocationController {
     return this.locationService.suggestCities(user, id);
   }
 
+  /** Re-run the AI/govt village auto-fetch for an existing district. */
+  @Post('districts/:id/refetch-cities')
+  refetchCities(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    return this.locationService.refetchCities(user, id);
+  }
+
   @Delete('cities/:id')
   deleteCity(@CurrentUser() user: AuthUser, @Param('id') id: string) {
     return this.locationService.deleteCity(user, id);
+  }
+
+  /* ------------------------------- Wards ------------------------------- */
+  /** Lazily auto-fetches wards on first access, then returns them. */
+  @Get('cities/:id/wards')
+  listWards(@Param('id') id: string) {
+    return this.locationService.listWards(id);
+  }
+
+  @Post('cities/:id/wards')
+  createWard(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Body() dto: CreateWardDto,
+  ) {
+    return this.locationService.createWard(user, id, dto);
+  }
+
+  /** Force a fresh ward auto-fetch for a city. */
+  @Post('cities/:id/wards/refetch')
+  refetchWards(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    return this.locationService.refetchWards(user, id);
+  }
+
+  @Delete('wards/:id')
+  deleteWard(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    return this.locationService.deleteWard(user, id);
   }
 
   /* ---------------------------- Localities ----------------------------- */

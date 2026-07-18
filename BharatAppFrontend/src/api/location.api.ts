@@ -10,6 +10,7 @@ export interface District {
   id: string;
   name: string;
   stateId: string;
+  citiesFetched?: boolean;
   _count?: {cities: number};
 }
 
@@ -17,7 +18,9 @@ export interface City {
   id: string;
   name: string;
   districtId: string;
-  _count?: {localities: number};
+  source?: string;
+  wardsFetched?: boolean;
+  _count?: {localities: number; wards: number};
 }
 
 export interface Locality {
@@ -25,6 +28,14 @@ export interface Locality {
   name: string;
   cityId: string;
   pincode?: string | null;
+}
+
+export interface Ward {
+  id: string;
+  number: string;
+  name: string;
+  cityId: string;
+  source?: string;
 }
 
 export interface SuggestResponse {
@@ -38,10 +49,22 @@ export interface MutationMessage {
   message: string;
 }
 
-/** Location hierarchy: State → District → City → Locality. */
+export interface RefetchResponse {
+  added: number;
+  message: string;
+}
+
+export interface AiStatus {
+  enabled: boolean;
+  provider?: string;
+  /** Whether wards can be auto-fetched (needs an OpenAI key; govt data has none). */
+  wardsAuto?: boolean;
+}
+
+/** Location hierarchy: State → District → City → (Locality | Ward). */
 export const locationApi = {
-  aiStatus: async (): Promise<{enabled: boolean}> =>
-    (await apiClient.get<{enabled: boolean}>('/locations/ai-status')).data,
+  aiStatus: async (): Promise<AiStatus> =>
+    (await apiClient.get<AiStatus>('/locations/ai-status')).data,
 
   /* States */
   listStates: async (): Promise<StateItem[]> =>
@@ -106,8 +129,39 @@ export const locationApi = {
         `/locations/districts/${districtId}/suggest-cities`,
       )
     ).data,
+  /** Re-run village auto-fetch (AI/govt) for a district. */
+  refetchCities: async (districtId: string): Promise<RefetchResponse> =>
+    (
+      await apiClient.post<RefetchResponse>(
+        `/locations/districts/${districtId}/refetch-cities`,
+      )
+    ).data,
   deleteCity: async (id: string): Promise<MutationMessage> =>
     (await apiClient.delete<MutationMessage>(`/locations/cities/${id}`)).data,
+
+  /* Wards (auto-populated on first fetch) */
+  listWards: async (cityId: string): Promise<Ward[]> =>
+    (await apiClient.get<Ward[]>(`/locations/cities/${cityId}/wards`)).data,
+  createWard: async (
+    cityId: string,
+    number: string,
+    name: string,
+  ): Promise<Ward> =>
+    (
+      await apiClient.post<Ward>(`/locations/cities/${cityId}/wards`, {
+        number,
+        name,
+      })
+    ).data,
+  /** Force a fresh ward auto-fetch for a city. */
+  refetchWards: async (cityId: string): Promise<RefetchResponse> =>
+    (
+      await apiClient.post<RefetchResponse>(
+        `/locations/cities/${cityId}/wards/refetch`,
+      )
+    ).data,
+  deleteWard: async (id: string): Promise<MutationMessage> =>
+    (await apiClient.delete<MutationMessage>(`/locations/wards/${id}`)).data,
 
   /* Localities */
   listLocalities: async (cityId: string): Promise<Locality[]> =>

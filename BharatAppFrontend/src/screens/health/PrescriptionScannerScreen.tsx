@@ -1,42 +1,122 @@
 import React, {useState} from 'react';
-import {View, ActivityIndicator, Pressable} from 'react-native';
+import {View, ActivityIndicator, Pressable, Alert, Image} from 'react-native';
+import {launchCamera, launchImageLibrary} from 'react-native-image-picker';
 import {NativeStackScreenProps} from '@react-navigation/native-stack';
 import {RootStackParamList} from '../../navigation/types';
 import {useTheme} from '../../context/ThemeContext';
 import {useTranslation} from '../../hooks/useTranslation';
-import {healthService} from '../../services/healthService';
-import {Screen, Header, Card, Button, AppText, Icon} from '../../components/common';
+import {scanPrescriptionImage, OCR_CONFIDENCE_THRESHOLD} from '../../services/prescriptionOcr';
+import {useMedicines} from '../../hooks/useMedicines';
+import {OcrMedicineMatch} from '../../types';
+import {Screen, Header, Card, Button, AppText, Icon, Input, Badge} from '../../components/common';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'PrescriptionScanner'>;
 
+/** A detected medicine plus local UI state for the confirm-if-unsure flow. */
+interface DetectedMed extends OcrMedicineMatch {
+  /** User-edited name, if they changed it during confirmation. */
+  editedName: string;
+  /** Uncertain reads must be explicitly confirmed before they're searchable. */
+  confirmed: boolean;
+}
+
+/**
+ * Real, end-to-end prescription scanning: camera/gallery photo → on-device
+ * ML Kit OCR → fuzzy match against the store's real catalogue
+ * (services/prescriptionOcr.ts). No mock data, no cloud API.
+ */
 const PrescriptionScannerScreen: React.FC<Props> = ({navigation}) => {
   const {theme} = useTheme();
   const {t} = useTranslation();
-  const [scanning, setScanning] = useState(false);
-  const [meds, setMeds] = useState<string[]>([]);
+  const {data: catalog} = useMedicines();
 
-  const scan = () => {
+  const [scanning, setScanning] = useState(false);
+  const [imageUri, setImageUri] = useState<string | undefined>();
+  const [meds, setMeds] = useState<DetectedMed[]>([]);
+  const [scannedOnce, setScannedOnce] = useState(false);
+
+  const runOcr = async (uri: string) => {
+    setImageUri(uri);
     setScanning(true);
     setMeds([]);
-    healthService.scanPrescription().then(m => {
-      setMeds(m);
+    try {
+      const matches = await scanPrescriptionImage(uri, catalog ?? []);
+      setMeds(
+        matches.map(m => ({
+          ...m,
+          editedName: m.name,
+          confirmed: m.confidence >= OCR_CONFIDENCE_THRESHOLD,
+        })),
+      );
+    } catch (e) {
+      Alert.alert(
+        'Could not read that photo',
+        e instanceof Error ? e.message : 'Please try again with a clearer, well-lit photo.',
+      );
+    } finally {
       setScanning(false);
-    });
+      setScannedOnce(true);
+    }
+  };
+
+  const takePhoto = async () => {
+    const result = await launchCamera({mediaType: 'photo', quality: 0.85, saveToPhotos: false});
+    if (result.didCancel) return;
+    if (result.errorCode) {
+      Alert.alert('Camera unavailable', result.errorMessage ?? 'Please check camera permissions and try again.');
+      return;
+    }
+    const uri = result.assets?.[0]?.uri;
+    if (uri) runOcr(uri);
+  };
+
+  const uploadPhoto = async () => {
+    const result = await launchImageLibrary({mediaType: 'photo', quality: 0.85, selectionLimit: 1});
+    if (result.didCancel) return;
+    if (result.errorCode) {
+      Alert.alert('Could not open gallery', result.errorMessage ?? 'Please check photo permissions and try again.');
+      return;
+    }
+    const uri = result.assets?.[0]?.uri;
+    if (uri) runOcr(uri);
+  };
+
+  const updateName = (index: number, name: string) => {
+    setMeds(prev => prev.map((m, i) => (i === index ? {...m, editedName: name} : m)));
+  };
+
+  const confirmMed = (index: number) => {
+    setMeds(prev => prev.map((m, i) => (i === index ? {...m, confirmed: true} : m)));
   };
 
   return (
     <Screen scroll padded>
       <Header title={t.health.scanPrescription} onBack={() => navigation.goBack()} />
 
-      {/* Camera frame */}
-      <Card style={{alignItems: 'center', paddingVertical: theme.spacing.huge, marginTop: theme.spacing.md, borderStyle: 'dashed', borderWidth: 2, borderColor: theme.colors.border, backgroundColor: theme.colors.cardAlt}}>
+      {/* Camera frame / preview */}
+      <Card
+        style={{
+          alignItems: 'center',
+          paddingVertical: imageUri ? theme.spacing.sm : theme.spacing.huge,
+          marginTop: theme.spacing.md,
+          borderStyle: 'dashed',
+          borderWidth: 2,
+          borderColor: theme.colors.border,
+          backgroundColor: theme.colors.cardAlt,
+          overflow: 'hidden',
+        }}>
         {scanning ? (
           <>
+            {imageUri && (
+              <Image source={{uri: imageUri}} style={{width: '100%', height: 160, borderRadius: theme.radius.md, marginBottom: theme.spacing.md}} resizeMode="cover" />
+            )}
             <ActivityIndicator color={theme.colors.primary} size="large" />
             <AppText variant="body" muted style={{marginTop: theme.spacing.md}}>
-              Reading prescription… (OCR)
+              Reading prescription… (on-device OCR)
             </AppText>
           </>
+        ) : imageUri ? (
+          <Image source={{uri: imageUri}} style={{width: '100%', height: 200, borderRadius: theme.radius.md}} resizeMode="cover" />
         ) : (
           <>
             <View style={{width: 80, height: 80, borderRadius: 40, backgroundColor: theme.colors.primarySoft, alignItems: 'center', justifyContent: 'center'}}>
@@ -50,8 +130,8 @@ const PrescriptionScannerScreen: React.FC<Props> = ({navigation}) => {
       </Card>
 
       <View style={{flexDirection: 'row', gap: theme.spacing.md, marginTop: theme.spacing.lg}}>
-        <Button label="Take photo" icon="camera" onPress={scan} loading={scanning} style={{flex: 1}} />
-        <Button label="Upload" icon="upload" variant="outline" onPress={scan} style={{flex: 1}} />
+        <Button label="Take photo" icon="camera" onPress={takePhoto} loading={scanning} disabled={scanning} style={{flex: 1}} />
+        <Button label="Upload" icon="upload" variant="outline" onPress={uploadPhoto} disabled={scanning} style={{flex: 1}} />
       </View>
 
       {/* Extracted meds */}
@@ -59,20 +139,60 @@ const PrescriptionScannerScreen: React.FC<Props> = ({navigation}) => {
         <View style={{marginTop: theme.spacing.xl}}>
           <AppText variant="h3">Detected medicines</AppText>
           <AppText variant="caption" muted style={{marginBottom: theme.spacing.md}}>
-            Tap to find nearby. If a name looks wrong, edit it.
+            Tap a confirmed medicine to find it at your store. Uncertain reads need a quick confirm.
           </AppText>
-          {meds.map(m => (
-            <Pressable key={m} onPress={() => navigation.navigate('Health', {medicine: m})}>
-              <Card style={{flexDirection: 'row', alignItems: 'center', gap: theme.spacing.md, marginBottom: theme.spacing.sm}}>
-                <Icon name="check-circle" size={20} color={theme.colors.accent} />
-                <AppText variant="body" style={{flex: 1}}>
-                  {m}
-                </AppText>
-                <Icon name="search" size={18} color={theme.colors.textMuted} />
+          {meds.map((m, i) =>
+            m.confirmed ? (
+              <Pressable key={i} onPress={() => navigation.navigate('Health', {medicine: m.editedName})}>
+                <Card style={{flexDirection: 'row', alignItems: 'center', gap: theme.spacing.md, marginBottom: theme.spacing.sm}}>
+                  <Icon name="check-circle" size={20} color={theme.colors.accent} />
+                  <View style={{flex: 1}}>
+                    <AppText variant="body">{m.editedName}</AppText>
+                    {m.medicineId && (
+                      <AppText variant="caption" color={theme.colors.accent}>
+                        Matches your store's catalogue
+                      </AppText>
+                    )}
+                  </View>
+                  <Icon name="search" size={18} color={theme.colors.textMuted} />
+                </Card>
+              </Pressable>
+            ) : (
+              <Card key={i} style={{marginBottom: theme.spacing.sm, borderColor: theme.colors.warning, borderWidth: 1}}>
+                <View style={{flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm, marginBottom: theme.spacing.sm}}>
+                  <Icon name="alert-triangle" size={16} color={theme.colors.warning} />
+                  <AppText variant="bodyStrong" style={{flex: 1}}>
+                    Not sure about this one
+                  </AppText>
+                  <Badge label={`${Math.round(m.confidence * 100)}% match`} color={theme.colors.warning} />
+                </View>
+                <Input
+                  value={m.editedName}
+                  onChangeText={name => updateName(i, name)}
+                  placeholder="Edit the medicine name"
+                  containerStyle={{marginBottom: theme.spacing.sm}}
+                />
+                <Button
+                  label="Confirm"
+                  icon="check"
+                  size="sm"
+                  disabled={!m.editedName.trim()}
+                  onPress={() => confirmMed(i)}
+                />
               </Card>
-            </Pressable>
-          ))}
+            ),
+          )}
         </View>
+      )}
+
+      {/* Nothing readable found */}
+      {scannedOnce && !scanning && meds.length === 0 && (
+        <Card style={{marginTop: theme.spacing.xl, alignItems: 'center', paddingVertical: theme.spacing.xl}}>
+          <Icon name="frown" size={28} color={theme.colors.textMuted} />
+          <AppText variant="body" muted center style={{marginTop: theme.spacing.sm, maxWidth: 260}}>
+            We couldn't read any medicine names from that photo. Try a clearer, well-lit, straight-on shot.
+          </AppText>
+        </Card>
       )}
     </Screen>
   );

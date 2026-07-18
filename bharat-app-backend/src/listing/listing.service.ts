@@ -12,10 +12,11 @@ import {
   UpdateListingDto,
 } from './dto/listing.dto';
 
-/** Common shape returned to clients (includes a light locality/city label). */
+/** Common shape returned to clients (includes a light locality/city/ward label). */
 const listingInclude = {
   locality: { select: { id: true, name: true } },
   city: { select: { id: true, name: true } },
+  ward: { select: { id: true, number: true, name: true } },
 } satisfies Prisma.ListingInclude;
 
 /**
@@ -50,6 +51,7 @@ export class ListingService {
     if (query.moduleKey) where.moduleKey = query.moduleKey;
     if (query.localityId) where.localityId = query.localityId;
     if (query.cityId) where.cityId = query.cityId;
+    if (query.wardId) where.wardId = query.wardId;
     if (query.type) where.type = query.type;
 
     const isManager = query.moduleKey
@@ -93,8 +95,16 @@ export class ListingService {
   async create(user: AuthUser, dto: CreateListingDto) {
     this.assertCanManage(user, dto.moduleKey);
 
-    // If only a locality is given, derive its city for consistent filtering.
+    // Derive the city from the finest location given (ward → locality), so
+    // city-level filtering stays consistent no matter what the manager picked.
     let cityId = dto.cityId ?? null;
+    if (dto.wardId) {
+      const ward = await this.prisma.ward.findUnique({
+        where: { id: dto.wardId },
+      });
+      if (!ward) throw new NotFoundException('Ward not found');
+      cityId = cityId ?? ward.cityId;
+    }
     if (dto.localityId) {
       const loc = await this.prisma.locality.findUnique({
         where: { id: dto.localityId },
@@ -115,6 +125,7 @@ export class ListingService {
         data: (dto.data as Prisma.InputJsonValue) ?? Prisma.JsonNull,
         cityId,
         localityId: dto.localityId ?? null,
+        wardId: dto.wardId ?? null,
         createdById: user.userId,
       },
       include: listingInclude,
@@ -138,7 +149,17 @@ export class ListingService {
     if (dto.data !== undefined)
       data.data = (dto.data as Prisma.InputJsonValue) ?? Prisma.JsonNull;
 
-    // Location change: keep city consistent with locality when locality changes.
+    // Location change: keep city consistent with the finest level chosen.
+    if (dto.wardId !== undefined) {
+      data.wardId = dto.wardId || null;
+      if (dto.wardId) {
+        const ward = await this.prisma.ward.findUnique({
+          where: { id: dto.wardId },
+        });
+        if (!ward) throw new NotFoundException('Ward not found');
+        if (dto.cityId === undefined) data.cityId = ward.cityId;
+      }
+    }
     if (dto.localityId !== undefined) {
       data.localityId = dto.localityId || null;
       if (dto.localityId) {
@@ -146,7 +167,8 @@ export class ListingService {
           where: { id: dto.localityId },
         });
         if (!loc) throw new NotFoundException('Locality not found');
-        if (dto.cityId === undefined) data.cityId = loc.cityId;
+        if (dto.cityId === undefined && data.cityId === undefined)
+          data.cityId = loc.cityId;
       }
     }
     if (dto.cityId !== undefined) data.cityId = dto.cityId || null;

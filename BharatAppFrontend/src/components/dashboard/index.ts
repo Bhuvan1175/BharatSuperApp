@@ -11,4 +11,5 @@ export {default as LoadingState} from './LoadingState';
 export {default as ErrorState} from './ErrorState';
 export {default as DepartmentDashboard} from './DepartmentDashboard';
 export {default as DevRoleSwitcher} from './DevRoleSwitcher';
+export {default as AccountButton} from './AccountButton';
 export {EmptyState} from '@components/common';

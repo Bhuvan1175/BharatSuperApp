@@ -28,6 +28,7 @@ import HealthScreen from '../screens/health/HealthScreen';
 import PrescriptionScannerScreen from '../screens/health/PrescriptionScannerScreen';
 import EmergencyScreen from '../screens/emergency/EmergencyScreen';
 import UtilitiesScreen from '../screens/utilities/UtilitiesScreen';
+import LocalAlertsScreen from '../screens/home/LocalAlertsScreen';
 import SettingsScreen from '../screens/profile/SettingsScreen';
 import SavedScreen from '../screens/profile/SavedScreen';
 import EditProfileScreen from '../screens/profile/EditProfileScreen';
@@ -49,6 +50,13 @@ import {
   ReportsScreen,
   ManageLocalitiesScreen,
 } from '../screens/department';
+import {
+  MedicineInventoryScreen,
+  AddMedicineScreen,
+  MedicineRequestsScreen,
+  StoreLocationScreen,
+} from '../screens/medicine';
+import MedicineRemindersScreen from '../screens/health/MedicineRemindersScreen';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -112,6 +120,7 @@ const RootNavigator: React.FC = () => {
             <Stack.Screen name="PrescriptionScanner" component={PrescriptionScannerScreen} />
             <Stack.Screen name="Emergency" component={EmergencyScreen} />
             <Stack.Screen name="Utilities" component={UtilitiesScreen} />
+            <Stack.Screen name="LocalAlerts" component={LocalAlertsScreen} />
             <Stack.Screen name="AreaScore" component={AreaScoreScreen} />
             <Stack.Screen name="RoadTrip" component={RoadTripScreen} />
             <Stack.Screen name="Eligibility" component={EligibilityScreen} />
@@ -133,6 +142,11 @@ const RootNavigator: React.FC = () => {
             <Stack.Screen name="DeptManageEntries" component={ManageEntriesScreen} />
             <Stack.Screen name="DeptReports" component={ReportsScreen} />
             <Stack.Screen name="DeptLocalities" component={ManageLocalitiesScreen} />
+            <Stack.Screen name="MedicineInventory" component={MedicineInventoryScreen} />
+            <Stack.Screen name="AddMedicine" component={AddMedicineScreen} />
+            <Stack.Screen name="MedicineRequests" component={MedicineRequestsScreen} />
+            <Stack.Screen name="StoreLocation" component={StoreLocationScreen} />
+            <Stack.Screen name="MedicineReminders" component={MedicineRemindersScreen} />
           </Stack.Group>
         )}
       </Stack.Navigator>

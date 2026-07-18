@@ -25,17 +25,24 @@ import {
   useCreateDistrict,
   useCreateLocality,
   useCreateState,
+  useCreateWard,
   useDeleteLocality,
+  useDeleteWard,
   useDistricts,
   useLocalities,
+  useRefetchCities,
+  useRefetchWards,
   useStates,
   useSuggestCities,
   useSuggestDistricts,
   useSuggestLocalities,
+  useWards,
 } from '../../hooks/useLocations';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 type Item = {id: string; name: string};
+
+const fail = (e: unknown) => Alert.alert('Failed', getApiErrorMessage(e));
 
 /**
  * One reusable "level" of the location cascade: an optional filter box, the
@@ -250,10 +257,137 @@ const LevelBlock: React.FC<{
   );
 };
 
+/**
+ * Ward level (Number + Name). Wards auto-populate the first time a city is
+ * opened (the backend lazily fetches & saves them). Managers can also add wards
+ * manually or re-fetch from the provider.
+ */
+const WardBlock: React.FC<{cityId: string; wardsAuto: boolean}> = ({
+  cityId,
+  wardsAuto,
+}) => {
+  const {theme} = useTheme();
+  const {data: wards, isLoading} = useWards(cityId);
+  const createWard = useCreateWard(cityId);
+  const deleteWard = useDeleteWard(cityId);
+  const refetchWards = useRefetchWards(cityId);
+  const [number, setNumber] = useState('');
+  const [name, setName] = useState('');
+
+  const submit = () => {
+    if (!number.trim() || !name.trim()) return;
+    createWard.mutate(
+      {number: number.trim(), name: name.trim()},
+      {
+        onSuccess: () => {
+          setNumber('');
+          setName('');
+        },
+        onError: fail,
+      },
+    );
+  };
+
+  return (
+    <View style={{marginTop: theme.spacing.md}}>
+      <SectionHeader title="Wards (number + name)" />
+
+      {isLoading ? (
+        <AppText variant="caption" muted style={{marginBottom: theme.spacing.sm}}>
+          Fetching wards…
+        </AppText>
+      ) : wards && wards.length ? (
+        wards.map(w => (
+          <Card
+            key={w.id}
+            style={{
+              marginBottom: theme.spacing.sm,
+              flexDirection: 'row',
+              alignItems: 'center',
+            }}>
+            <AppText variant="body" style={{flex: 1}} numberOfLines={1}>
+              Ward {w.number} — {w.name}
+            </AppText>
+            <Pressable
+              hitSlop={8}
+              onPress={() =>
+                Alert.alert('Delete ward?', `Remove "Ward ${w.number} — ${w.name}"?`, [
+                  {text: 'Cancel', style: 'cancel'},
+                  {
+                    text: 'Delete',
+                    style: 'destructive',
+                    onPress: () => deleteWard.mutate(w.id, {onError: fail}),
+                  },
+                ])
+              }>
+              <Icon name="trash-2" size={18} color={theme.colors.danger} />
+            </Pressable>
+          </Card>
+        ))
+      ) : (
+        <AppText variant="caption" muted style={{marginBottom: theme.spacing.sm}}>
+          {wardsAuto
+            ? 'No wards found automatically — add one below or re-fetch.'
+            : 'No wards yet — add each ward’s number + name below.'}
+        </AppText>
+      )}
+
+      {/* Add a ward (number + name) */}
+      <View
+        style={{
+          flexDirection: 'row',
+          gap: theme.spacing.sm,
+          alignItems: 'flex-end',
+        }}>
+        <Input
+          value={number}
+          onChangeText={setNumber}
+          placeholder="No."
+          containerStyle={{width: 72}}
+        />
+        <Input
+          value={name}
+          onChangeText={setName}
+          placeholder="Ward name"
+          containerStyle={{flex: 1}}
+        />
+        <Button
+          label="Add"
+          size="sm"
+          fullWidth={false}
+          onPress={submit}
+          loading={createWard.isPending}
+          disabled={createWard.isPending}
+        />
+      </View>
+
+      {wardsAuto && (
+        <Button
+          label={refetchWards.isPending ? 'Fetching…' : 'Re-fetch wards with AI'}
+          icon="refresh-cw"
+          variant="outline"
+          size="sm"
+          onPress={() =>
+            refetchWards.mutate(undefined, {
+              onSuccess: r => Alert.alert('Wards', r.message),
+              onError: fail,
+            })
+          }
+          loading={refetchWards.isPending}
+          disabled={refetchWards.isPending}
+          style={{marginTop: theme.spacing.sm}}
+        />
+      )}
+    </View>
+  );
+};
+
 const ManageLocalitiesScreen: React.FC = () => {
+  const {theme} = useTheme();
   const navigation = useNavigation<Nav>();
   const {data: aiStatus} = useAiStatus();
   const aiEnabled = !!aiStatus?.enabled;
+  const wardsAuto = !!aiStatus?.wardsAuto;
 
   const [stateId, setStateId] = useState<string | undefined>();
   const [districtId, setDistrictId] = useState<string | undefined>();
@@ -281,16 +415,26 @@ const ManageLocalitiesScreen: React.FC = () => {
   const bulkCities = useBulkCities(districtId ?? '');
   const bulkLocalities = useBulkLocalities(cityId ?? '');
   const deleteLocality = useDeleteLocality(cityId);
+  const refetchCities = useRefetchCities(districtId ?? '');
 
   const suggestDistricts = useSuggestDistricts();
   const suggestCities = useSuggestCities();
   const suggestLocalities = useSuggestLocalities();
 
-  const fail = (e: unknown) => Alert.alert('Failed', getApiErrorMessage(e));
-
   return (
     <Screen scroll padded>
       <Header title="Areas & settings" onBack={() => navigation.goBack()} />
+
+      {aiEnabled && (
+        <AppText variant="caption" muted style={{marginTop: theme.spacing.sm}}>
+          Auto-fill is on ({aiStatus?.provider}). Villages fill in when you add a
+          district.{' '}
+          {wardsAuto
+            ? 'Wards fill in when you open a village.'
+            : 'Add each village’s wards (number + name) below.'}{' '}
+          Please review auto-filled data for accuracy.
+        </AppText>
+      )}
 
       {/* STATE */}
       <LevelBlock
@@ -327,7 +471,15 @@ const ManageLocalitiesScreen: React.FC = () => {
           addPlaceholder="Add a district (e.g. Nagpur)"
           onAdd={name =>
             createDistrict.mutate(name, {
-              onSuccess: d => setDistrictId(d.id),
+              onSuccess: d => {
+                setDistrictId(d.id);
+                if (aiEnabled) {
+                  Alert.alert(
+                    'Fetching villages',
+                    'Villages for this district are being fetched automatically. They will appear in the City / village list shortly.',
+                  );
+                }
+              },
               onError: fail,
             })
           }
@@ -357,17 +509,17 @@ const ManageLocalitiesScreen: React.FC = () => {
         />
       )}
 
-      {/* CITY */}
+      {/* CITY / VILLAGE */}
       {!!districtId && (
         <LevelBlock
-          title="City / town"
+          title="City / village"
           items={cities ?? []}
           selectedId={cityId}
           onSelect={id => {
             setCityId(id);
             setLocSug([]);
           }}
-          addPlaceholder="Add a city / town (e.g. Kalmeshwar)"
+          addPlaceholder="Add a city / village (e.g. Kalmeshwar)"
           onAdd={name =>
             createCity.mutate(name, {onSuccess: c => setCityId(c.id), onError: fail})
           }
@@ -397,10 +549,32 @@ const ManageLocalitiesScreen: React.FC = () => {
         />
       )}
 
-      {/* LOCALITY (leaf) */}
+      {/* Re-fetch villages for the selected district (auto-fill top-up). */}
+      {!!districtId && aiEnabled && (
+        <Button
+          label={refetchCities.isPending ? 'Fetching villages…' : 'Re-fetch villages with AI'}
+          icon="refresh-cw"
+          variant="outline"
+          size="sm"
+          onPress={() =>
+            refetchCities.mutate(undefined, {
+              onSuccess: r => Alert.alert('Villages', r.message),
+              onError: fail,
+            })
+          }
+          loading={refetchCities.isPending}
+          disabled={refetchCities.isPending}
+          style={{marginTop: theme.spacing.sm}}
+        />
+      )}
+
+      {/* WARDS (auto-populated) */}
+      {!!cityId && <WardBlock cityId={cityId} wardsAuto={wardsAuto} />}
+
+      {/* LOCALITY (optional free-text areas) */}
       {!!cityId && (
         <LevelBlock
-          title="Areas / localities"
+          title="Areas / localities (optional)"
           items={localities ?? []}
           onDelete={item =>
             Alert.alert('Delete area?', `Remove "${item.name}"?`, [
@@ -413,7 +587,7 @@ const ManageLocalitiesScreen: React.FC = () => {
               },
             ])
           }
-          addPlaceholder="Add an area (e.g. Ward 3)"
+          addPlaceholder="Add an area (e.g. Gandhi Nagar)"
           onAdd={name =>
             createLocality.mutate(name, {onError: fail})
           }

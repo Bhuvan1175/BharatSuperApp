@@ -10,6 +10,7 @@ export const LISTING_KEYS = {
   list: (filters?: ListingFilters) => ['listings', filters ?? {}] as const,
   stats: (moduleKey?: string) => ['listings', 'stats', moduleKey ?? ''] as const,
   one: (id: string) => ['listings', 'one', id] as const,
+  publicAlerts: ['listings', 'public-alerts'] as const,
 };
 
 export const useListings = (filters?: ListingFilters) =>
@@ -17,6 +18,18 @@ export const useListings = (filters?: ListingFilters) =>
     queryKey: LISTING_KEYS.list(filters),
     queryFn: () => listingsApi.list(filters),
     enabled: !!filters?.moduleKey,
+  });
+
+/**
+ * Citizen-facing feed of live ALERTS across every department (Water,
+ * Electricity, …). No moduleKey filter, so the backend returns only "active"
+ * alerts (managers aren't identified here). Powers the Home "Local Alerts"
+ * section.
+ */
+export const usePublicAlerts = () =>
+  useQuery({
+    queryKey: LISTING_KEYS.publicAlerts,
+    queryFn: () => listingsApi.list({type: 'alert'}),
   });
 
 export const useListingStats = (moduleKey?: string) =>

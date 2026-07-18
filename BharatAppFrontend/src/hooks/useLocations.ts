@@ -10,6 +10,7 @@ export const LOCATION_KEYS = {
     ['locations', 'cities', districtId ?? ''] as const,
   localities: (cityId?: string) =>
     ['locations', 'localities', cityId ?? ''] as const,
+  wards: (cityId?: string) => ['locations', 'wards', cityId ?? ''] as const,
 };
 
 export const useAiStatus = () =>
@@ -45,6 +46,19 @@ export const useLocalities = (cityId?: string) =>
     enabled: !!cityId,
   });
 
+/**
+ * Wards for a city. The backend lazily auto-fetches & saves them on first
+ * access, so simply mounting this hook (when a village is selected) makes the
+ * ward dropdowns populate on their own. The first call can take a few seconds
+ * while the provider responds.
+ */
+export const useWards = (cityId?: string) =>
+  useQuery({
+    queryKey: LOCATION_KEYS.wards(cityId),
+    queryFn: () => locationApi.listWards(cityId as string),
+    enabled: !!cityId,
+  });
+
 /* ------------------------------ Mutations ----------------------------- */
 
 export const useCreateState = () => {
@@ -67,9 +81,17 @@ export const useCreateDistrict = (stateId: string) => {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (name: string) => locationApi.createDistrict(stateId, name),
+    // Creating a district kicks off a background village fetch on the backend.
+    // Refresh districts immediately, then re-check the cities list a few times
+    // so the auto-fetched villages appear on their own once they're saved.
     onSuccess: () => {
       qc.invalidateQueries({queryKey: LOCATION_KEYS.districts(stateId)});
       qc.invalidateQueries({queryKey: LOCATION_KEYS.states});
+      const bumpCities = () =>
+        qc.invalidateQueries({queryKey: ['locations', 'cities']});
+      bumpCities();
+      setTimeout(bumpCities, 4000);
+      setTimeout(bumpCities, 9000);
     },
   });
 };
@@ -93,6 +115,16 @@ export const useDeleteDistrict = (stateId?: string) => {
       qc.invalidateQueries({queryKey: LOCATION_KEYS.districts(stateId)});
       qc.invalidateQueries({queryKey: LOCATION_KEYS.states});
     },
+  });
+};
+
+/** Re-run village auto-fetch for an existing district. */
+export const useRefetchCities = (districtId: string) => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => locationApi.refetchCities(districtId),
+    onSuccess: () =>
+      qc.invalidateQueries({queryKey: LOCATION_KEYS.cities(districtId)}),
   });
 };
 
@@ -124,6 +156,40 @@ export const useDeleteCity = (districtId?: string) => {
       qc.invalidateQueries({queryKey: LOCATION_KEYS.cities(districtId)}),
   });
 };
+
+/* -------------------------------- Wards ------------------------------- */
+
+export const useCreateWard = (cityId: string) => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({number, name}: {number: string; name: string}) =>
+      locationApi.createWard(cityId, number, name),
+    onSuccess: () => {
+      qc.invalidateQueries({queryKey: LOCATION_KEYS.wards(cityId)});
+      qc.invalidateQueries({queryKey: LOCATION_KEYS.cities()});
+    },
+  });
+};
+
+export const useDeleteWard = (cityId?: string) => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => locationApi.deleteWard(id),
+    onSuccess: () =>
+      qc.invalidateQueries({queryKey: LOCATION_KEYS.wards(cityId)}),
+  });
+};
+
+export const useRefetchWards = (cityId: string) => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => locationApi.refetchWards(cityId),
+    onSuccess: () =>
+      qc.invalidateQueries({queryKey: LOCATION_KEYS.wards(cityId)}),
+  });
+};
+
+/* ----------------------------- Localities ----------------------------- */
 
 export const useCreateLocality = (cityId: string) => {
   const qc = useQueryClient();

@@ -5,18 +5,22 @@ import BottomTabNavigator from './BottomTabNavigator';
 import {AdminDashboardScreen} from '@screens/admin';
 import DepartmentDashboard from '@components/dashboard/DepartmentDashboard';
 import DevRoleSwitcher from '@components/dashboard/DevRoleSwitcher';
+import {MedicineDashboardScreen} from '@screens/medicine';
 
 /**
  * RoleRouter — the single decision point that maps the signed-in user to their
- * home surface. It is now fully backend-driven and generic:
+ * home surface. It is backend-driven and generic:
  *
  *   SUPER_ADMIN            → Admin dashboard
- *   has a department       → the generic DepartmentDashboard (works for ANY
+ *   department "medicine"  → the bespoke Medicine Store Dashboard (real
+ *                            inventory + citizen request workflow — a first-
+ *                            class domain, not generic bulletin entries)
+ *   any other department   → the generic DepartmentDashboard (works for ANY
  *                            department, including ones created at runtime)
  *   otherwise (citizen)    → the existing 5-tab app
  *
- * No per-module component registry and no hardcoded role list — so a brand-new
- * department needs zero frontend changes.
+ * Only Medicine is special-cased; every other department still needs zero
+ * frontend changes to get a working dashboard.
  */
 const RoleRouter: React.FC = () => {
   const role = useAuthStore(s => s.role);
@@ -25,6 +29,8 @@ const RoleRouter: React.FC = () => {
   let dashboard: React.ReactNode;
   if (role === 'SUPER_ADMIN') {
     dashboard = <AdminDashboardScreen />;
+  } else if (department?.moduleKey === 'medicine') {
+    dashboard = <MedicineDashboardScreen />;
   } else if (department) {
     dashboard = <DepartmentDashboard />;
   } else {
