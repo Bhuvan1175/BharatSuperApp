@@ -26,6 +26,10 @@ export interface Medicine {
   lowStockThreshold: number;
   isActive: boolean;
   stockStatus: StockStatus;
+  /** Real generic-alternative info, set by the manager — null until they fill it in. */
+  genericName: string | null;
+  genericPrice: number | null;
+  dosageNote: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -72,6 +76,9 @@ export interface CreateMedicineBody {
   price?: number;
   stockQty?: number;
   lowStockThreshold?: number;
+  genericName?: string;
+  genericPrice?: number;
+  dosageNote?: string;
 }
 
 export type UpdateMedicineBody = Partial<

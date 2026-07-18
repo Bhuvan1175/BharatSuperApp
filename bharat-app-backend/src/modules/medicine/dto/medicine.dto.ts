@@ -80,6 +80,24 @@ export class CreateMedicineDto {
   @IsInt()
   @Min(0)
   lowStockThreshold?: number;
+
+  /** Real generic-alternative name, e.g. "Paracetamol 650 (generic)". */
+  @IsOptional()
+  @IsString()
+  @MaxLength(140)
+  genericName?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  genericPrice?: number;
+
+  /** Short dosage/safety guidance shown with the generic alternative. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(300)
+  dosageNote?: string;
 }
 
 export class UpdateMedicineDto {
@@ -133,6 +151,22 @@ export class UpdateMedicineDto {
   @IsOptional()
   @IsBoolean()
   isActive?: boolean;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(140)
+  genericName?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  genericPrice?: number;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(300)
+  dosageNote?: string;
 }
 
 /** Body for PATCH /medicines/:id/stock — sets the absolute stock quantity. */

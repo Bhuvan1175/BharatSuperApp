@@ -34,6 +34,10 @@
 	</dict>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string></string>
+	<key>NSCameraUsageDescription</key>
+	<string>Bharat Super App uses your camera to scan prescriptions and update your profile photo.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Bharat Super App needs access to your photos to upload a prescription or profile photo.</string>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIRequiredDeviceCapabilities</key>

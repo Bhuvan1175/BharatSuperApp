@@ -229,6 +229,13 @@ model Medicine {
   /// Batch/lot number for the current stock (from the manufacturer's pack).
   batchNumber       String?
   expiryDate        DateTime?
+  /// Real generic-alternative info the manager can set per medicine — the
+  /// citizen Health screen only shows a "generic alternative" card when this
+  /// is actually filled in (never a guess).
+  genericName       String?
+  genericPrice      Float?
+  /// Short dosage/safety guidance shown alongside the generic alternative.
+  dosageNote        String?
   /// Unit of sale, e.g. "tablet", "strip", "bottle", "unit".
   unit              String   @default("unit")
   price             Float    @default(0)

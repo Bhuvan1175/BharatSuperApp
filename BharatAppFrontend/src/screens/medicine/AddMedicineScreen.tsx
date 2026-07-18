@@ -43,6 +43,9 @@ const AddMedicineScreen: React.FC = () => {
   const [price, setPrice] = useState('');
   const [stockQty, setStockQty] = useState('0');
   const [lowStockThreshold, setLowStockThreshold] = useState('10');
+  const [genericName, setGenericName] = useState('');
+  const [genericPrice, setGenericPrice] = useState('');
+  const [dosageNote, setDosageNote] = useState('');
 
   useEffect(() => {
     if (!existing) return;
@@ -56,6 +59,9 @@ const AddMedicineScreen: React.FC = () => {
     setPrice(String(existing.price));
     setStockQty(String(existing.stockQty));
     setLowStockThreshold(String(existing.lowStockThreshold));
+    setGenericName(existing.genericName ?? '');
+    setGenericPrice(existing.genericPrice != null ? String(existing.genericPrice) : '');
+    setDosageNote(existing.dosageNote ?? '');
   }, [existing]);
 
   const busy =
@@ -81,6 +87,9 @@ const AddMedicineScreen: React.FC = () => {
       unit: unit.trim() || 'unit',
       price: priceNum,
       lowStockThreshold: thresholdNum,
+      genericName: genericName.trim() || undefined,
+      genericPrice: genericPrice.trim() ? Number(genericPrice) || undefined : undefined,
+      dosageNote: dosageNote.trim() || undefined,
     };
 
     if (isEdit && medicineId) {
@@ -239,6 +248,39 @@ const AddMedicineScreen: React.FC = () => {
       <AppText variant="caption" muted style={{marginBottom: theme.spacing.lg}}>
         Marked "Low Stock" once quantity falls to or below this number; "Out of Stock" at zero.
       </AppText>
+
+      <AppText variant="h3" style={{marginBottom: theme.spacing.sm}}>
+        Generic alternative (optional)
+      </AppText>
+      <AppText variant="caption" muted style={{marginBottom: theme.spacing.md}}>
+        Shown to citizens on the Health screen as a cheaper alternative. Leave blank to hide this card for this medicine.
+      </AppText>
+      <Input
+        label="Generic name"
+        icon="repeat"
+        value={genericName}
+        onChangeText={setGenericName}
+        placeholder="e.g. Paracetamol 650 (generic)"
+        containerStyle={{marginBottom: theme.spacing.lg}}
+      />
+      <Input
+        label="Generic price (₹)"
+        icon="tag"
+        value={genericPrice}
+        onChangeText={setGenericPrice}
+        keyboardType="decimal-pad"
+        placeholder="e.g. 14"
+        containerStyle={{marginBottom: theme.spacing.lg}}
+      />
+      <Input
+        label="Dosage / safety note"
+        icon="info"
+        value={dosageNote}
+        onChangeText={setDosageNote}
+        placeholder="e.g. 1 tablet every 6 hours after food; max 3/day."
+        multiline
+        containerStyle={{marginBottom: theme.spacing.lg}}
+      />
 
       <Button
         label={isEdit ? 'Save changes' : 'Add medicine'}

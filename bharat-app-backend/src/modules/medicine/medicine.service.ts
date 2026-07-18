@@ -135,6 +135,9 @@ export class MedicineService {
         price: dto.price ?? 0,
         stockQty: dto.stockQty ?? 0,
         lowStockThreshold: dto.lowStockThreshold ?? 10,
+        genericName: dto.genericName ?? null,
+        genericPrice: dto.genericPrice ?? null,
+        dosageNote: dto.dosageNote ?? null,
         createdById: user.userId,
       },
     });
@@ -156,6 +159,9 @@ export class MedicineService {
         price: dto.price,
         lowStockThreshold: dto.lowStockThreshold,
         isActive: dto.isActive,
+        genericName: dto.genericName,
+        genericPrice: dto.genericPrice,
+        dosageNote: dto.dosageNote,
       },
     });
     return this.withStockStatus(medicine);
