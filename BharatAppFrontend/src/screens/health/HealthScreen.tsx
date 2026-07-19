@@ -1,4 +1,4 @@
-import React, {useState} from 'react';
+import React, {useEffect, useState} from 'react';
 import {View, ActivityIndicator, Linking, Alert, Pressable} from 'react-native';
 import {NativeStackScreenProps} from '@react-navigation/native-stack';
 import {RootStackParamList} from '../../navigation/types';
@@ -32,6 +32,16 @@ const HealthScreen: React.FC<Props> = ({navigation, route}) => {
   const {toggleSaved, isSaved} = useAppData();
   const [query, setQuery] = useState(route.params?.medicine ?? '');
   const debouncedQuery = useDebounce(query, 350);
+
+  // Health already exists in the stack once you've scanned a prescription
+  // from it, so navigating back with a new `medicine` param pops to this
+  // same instance rather than remounting it — the useState initializer above
+  // only fires once, so re-sync `query` here whenever a fresh param arrives.
+  useEffect(() => {
+    if (route.params?.medicine !== undefined) {
+      setQuery(route.params.medicine);
+    }
+  }, [route.params?.medicine]);
 
   const {data: matches, isLoading, isFetching} = useMedicines({search: debouncedQuery});
   const {data: storeInfo} = useMedicineStore();
