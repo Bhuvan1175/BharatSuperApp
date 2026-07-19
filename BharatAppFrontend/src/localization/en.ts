@@ -21,11 +21,14 @@ export const en = {
   },
   onboarding: {
     slide1Title: 'One app for everyday life',
-    slide1Body: 'Health, areas, fuel, schemes, utilities and emergencies — all in one place.',
+    slide1Body:
+      'Health, areas, fuel, schemes, utilities and emergencies — all in one place.',
     slide2Title: 'Just ask — by text or voice',
-    slide2Body: 'Your AI assistant understands your day and answers with real, local information.',
+    slide2Body:
+      'Your AI assistant understands your day and answers with real, local information.',
     slide3Title: 'Act in one tap',
-    slide3Body: 'Get directions, apply, set reminders or call — instantly from any answer.',
+    slide3Body:
+      'Get directions, apply, set reminders or call — instantly from any answer.',
     chooseLanguage: 'Choose your language',
     getStarted: 'Get started',
   },
@@ -44,7 +47,8 @@ export const en = {
     useBiometric: 'Use biometric unlock',
     useOtpInstead: 'Use OTP instead',
     permTitle: 'Enable location',
-    permSubtitle: 'Location powers all your "near me" answers — pharmacies, fuel, areas and help nearby.',
+    permSubtitle:
+      'Location powers all your "near me" answers — pharmacies, fuel, areas and help nearby.',
     allowLocation: 'Allow location',
     enterManually: 'Enter my area manually',
   },
@@ -72,7 +76,8 @@ export const en = {
   chat: {
     title: 'AI Assistant',
     emptyGreeting: 'How can I help you today?',
-    emptySub: 'Ask me anything about your day — I understand your area, health, schemes and more.',
+    emptySub:
+      'Ask me anything about your day — I understand your area, health, schemes and more.',
     inputPlaceholder: 'Ask anything…',
     thinking: 'Thinking…',
     suggestions: [
@@ -91,6 +96,7 @@ export const en = {
     nearby: 'Nearby',
     avgRent: 'Avg rent',
     avgPrice: 'Avg price',
+    pricePerSqft: 'Price / sqft',
     priceGrowth: 'Price growth',
     builderRating: 'Builder rating',
     hospitals: 'Hospitals',
@@ -139,7 +145,8 @@ export const en = {
     dosage: 'Dosage guide',
     setReminder: 'Set reminder',
     scanPrescription: 'Scan prescription',
-    disclaimer: 'Guidance only. Consult a doctor or pharmacist before taking any medicine.',
+    disclaimer:
+      'Guidance only. Consult a doctor or pharmacist before taking any medicine.',
     saveMoney: 'Save {pct}%',
   },
   emergency: {

@@ -1,0 +1,25 @@
+const EARTH_RADIUS_METERS = 6371000;
+/** Average walking speed used for the walk-time estimate, km/h. */
+const WALKING_SPEED_KMH = 5;
+
+/** Great-circle distance between two lat/long points, in meters. */
+export function haversineDistanceMeters(
+  lat1: number,
+  lon1: number,
+  lat2: number,
+  lon2: number,
+): number {
+  const toRad = (d: number) => (d * Math.PI) / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return EARTH_RADIUS_METERS * c;
+}
+
+/** Straight-line walk-time estimate, rounded to the nearest minute. */
+export function walkTimeMinutes(distanceMeters: number): number {
+  return Math.round((distanceMeters / 1000 / WALKING_SPEED_KMH) * 60);
+}

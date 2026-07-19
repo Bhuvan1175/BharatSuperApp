@@ -38,6 +38,10 @@ model User {
   medicineRequestsMade    MedicineRequest[] @relation("MedicineRequestCitizen")
   medicineRequestsDecided MedicineRequest[] @relation("MedicineRequestDecidedBy")
 
+  // ---- Area Intelligence domain (added; all optional/defaulted → additive) ----
+  savedAreas        SavedArea[]
+  triggeredAreaJobs BackgroundJobLog[] @relation("BackgroundJobTriggeredBy")
+
   @@index([roleId])
   @@index([departmentId])
 }
@@ -45,30 +49,30 @@ model User {
 /// A role a user can hold. Data-driven so a Super Admin can create new roles at
 /// runtime. `permissions` are strings like "medicine:manage"; "*" = all.
 model Role {
-  id          String   @id @default(cuid())
-  name        String   @unique
-  label       String?
-  permissions String[] @default([])
+  id                    String       @id @default(cuid())
+  name                  String       @unique
+  label                 String?
+  permissions           String[]     @default([])
   // System roles are seeded and must not be deleted via the admin API.
-  isSystem    Boolean  @default(false)
-  users       User[]
+  isSystem              Boolean      @default(false)
+  users                 User[]
   // Departments for which this role is the default manager role.
   defaultForDepartments Department[] @relation("DepartmentDefaultRole")
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt             DateTime     @default(now())
+  updatedAt             DateTime     @updatedAt
 }
 
 /// A department that owns one app module. `moduleKey` (e.g. "medicine") ties the
 /// department to a module and matches the frontend module keys. `defaultRole`
 /// is the manager role auto-assigned when a user is put in this department.
 model Department {
-  id            String   @id @default(cuid())
-  name          String   @unique
+  id            String  @id @default(cuid())
+  name          String  @unique
   label         String?
-  moduleKey     String   @unique
-  isActive      Boolean  @default(true)
+  moduleKey     String  @unique
+  isActive      Boolean @default(true)
   defaultRoleId String?
-  defaultRole   Role?    @relation("DepartmentDefaultRole", fields: [defaultRoleId], references: [id])
+  defaultRole   Role?   @relation("DepartmentDefaultRole", fields: [defaultRoleId], references: [id])
   users         User[]
 
   /// Physical location / contact details for the department's public-facing
@@ -81,8 +85,8 @@ model Department {
   phone        String?
   openingHours String?
 
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([defaultRoleId])
 }
@@ -100,51 +104,54 @@ model State {
 }
 
 model District {
-  id        String   @id @default(cuid())
-  name      String
-  stateId   String
-  state     State    @relation(fields: [stateId], references: [id], onDelete: Cascade)
-  cities    City[]
+  id            String   @id @default(cuid())
+  name          String
+  stateId       String
+  state         State    @relation(fields: [stateId], references: [id], onDelete: Cascade)
+  cities        City[]
   // True once villages/cities have been auto-fetched (AI or govt data) for this
   // district, so the app can show status and avoid needless re-fetching.
-  citiesFetched Boolean @default(false)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  citiesFetched Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
   @@unique([stateId, name])
   @@index([stateId])
 }
 
 model City {
-  id         String     @id @default(cuid())
-  name       String
-  districtId String
-  district   District   @relation(fields: [districtId], references: [id], onDelete: Cascade)
-  localities Locality[]
-  wards      Ward[]
-  listings   Listing[]
+  id           String     @id @default(cuid())
+  name         String
+  districtId   String
+  district     District   @relation(fields: [districtId], references: [id], onDelete: Cascade)
+  localities   Locality[]
+  wards        Ward[]
+  listings     Listing[]
   // How this city was created: "manual" | "ai" | "govt".
-  source     String     @default("manual")
+  source       String     @default("manual")
   // True once wards have been auto-fetched for this city (lazy, on first view).
-  wardsFetched Boolean  @default(false)
-  createdAt  DateTime   @default(now())
-  updatedAt  DateTime   @updatedAt
+  wardsFetched Boolean    @default(false)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
 
   @@unique([districtId, name])
   @@index([districtId])
 }
 
 model Locality {
-  id        String    @id @default(cuid())
-  name      String
-  pincode   String?
-  latitude  Float?
-  longitude Float?
-  cityId    String
-  city      City      @relation(fields: [cityId], references: [id], onDelete: Cascade)
-  listings  Listing[]
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  id         String      @id @default(cuid())
+  name       String
+  pincode    String?
+  latitude   Float?
+  longitude  Float?
+  cityId     String
+  city       City        @relation(fields: [cityId], references: [id], onDelete: Cascade)
+  listings   Listing[]
+  // 1:1 extension — the Area Intelligence registry row for this locality, if
+  // one has been synced/created. Not every Locality has one.
+  areaMaster AreaMaster?
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
 
   @@unique([cityId, name])
   @@index([cityId])
@@ -191,7 +198,7 @@ model Listing {
   ward       Ward?     @relation(fields: [wardId], references: [id], onDelete: SetNull)
 
   createdById String?
-  createdBy   User?    @relation("ListingCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  createdBy   User?   @relation("ListingCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -220,7 +227,7 @@ enum RequestStatus {
 /// Out of Stock) is derived from `stockQty` vs `lowStockThreshold`, not stored,
 /// so a single threshold edit can't leave a stale status behind.
 model Medicine {
-  id                String   @id @default(cuid())
+  id                String    @id @default(cuid())
   name              String
   description       String?
   /// Dosage strength label, e.g. "250mg", "500mg", "5ml".
@@ -237,16 +244,16 @@ model Medicine {
   /// Short dosage/safety guidance shown alongside the generic alternative.
   dosageNote        String?
   /// Unit of sale, e.g. "tablet", "strip", "bottle", "unit".
-  unit              String   @default("unit")
-  price             Float    @default(0)
-  stockQty          Int      @default(0)
+  unit              String    @default("unit")
+  price             Float     @default(0)
+  stockQty          Int       @default(0)
   /// stockQty at or below this (but > 0) is "Low Stock"; 0 is "Out of Stock".
-  lowStockThreshold Int      @default(10)
+  lowStockThreshold Int       @default(10)
   /// Soft-hide from the citizen-facing catalogue without deleting history.
-  isActive          Boolean  @default(true)
+  isActive          Boolean   @default(true)
 
   createdById String?
-  createdBy   User?    @relation("MedicineCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  createdBy   User?   @relation("MedicineCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
 
   requests MedicineRequest[]
 
@@ -261,7 +268,7 @@ model Medicine {
 /// The Medicine Store Dashboard is the source of truth: accepting/completing a
 /// request here is what moves stock and what the citizen sees.
 model MedicineRequest {
-  id     String @id @default(cuid())
+  id           String   @id @default(cuid())
   medicineId   String
   medicine     Medicine @relation(fields: [medicineId], references: [id], onDelete: Cascade)
   /// Snapshot of the medicine name at request time (survives renames/deletes).
@@ -273,7 +280,7 @@ model MedicineRequest {
   notes    String?
 
   citizenId   String
-  citizen     User   @relation("MedicineRequestCitizen", fields: [citizenId], references: [id], onDelete: Cascade)
+  citizen     User    @relation("MedicineRequestCitizen", fields: [citizenId], references: [id], onDelete: Cascade)
   /// Snapshot of the citizen's name at request time, for the dashboard list.
   citizenName String?
 
@@ -287,4 +294,335 @@ model MedicineRequest {
   @@index([medicineId])
   @@index([citizenId])
   @@index([status])
+}
+
+/// ---- Area Intelligence domain ----
+/// Extends the existing State→District→City→Locality hierarchy (does not
+/// duplicate it): AreaMaster is a 1:1 extension of Locality. Owner-editable vs
+/// system-only is enforced by which service can write the table, not a column
+/// flag — no listing/property controller ever imports these models' write
+/// paths. See docs/area-intelligence-architecture.md for the full design.
+
+enum AreaMasterSource {
+  GOVT
+  MANUAL
+  DERIVED
+}
+
+enum SyncStatus {
+  PENDING
+  SYNCED
+  FAILED
+  STALE
+}
+
+enum AreaScoreCategory {
+  SAFETY
+  TRAFFIC
+  HEALTHCARE
+  SCHOOL
+  INTERNET
+  UTILITIES
+}
+
+enum AmenityCategory {
+  HOSPITAL
+  SCHOOL
+  POLICE
+  PARK
+  MARKET
+  ATM
+  BUS_STOP
+  METRO
+}
+
+enum DataSourceCategory {
+  GOVT
+  MAPS
+  TRAFFIC
+  HEALTHCARE
+  SCHOOL
+  CRIME
+  INTERNET
+  WEATHER
+}
+
+enum BackgroundJobType {
+  AREA_MASTER_SYNC
+  NEARBY_REFRESH
+  TRAFFIC_UPDATE
+  INTERNET_UPDATE
+  SCORE_RECALC
+  PROPERTY_STATS_UPDATE
+  BUILDER_RATING_UPDATE
+  HISTORY_CLEANUP
+}
+
+enum JobStatus {
+  RUNNING
+  SUCCESS
+  FAILED
+  PARTIAL
+}
+
+/// Canonical area registry, synced from government data. Latitude/longitude/
+/// pincode/city are read through `locality`, never copied onto this row.
+model AreaMaster {
+  id                 String           @id @default(cuid())
+  localityId         String           @unique
+  locality           Locality         @relation(fields: [localityId], references: [id], onDelete: Cascade)
+  administrativeCode String?
+  population         Int?
+  populationYear     Int?
+  source             AreaMasterSource @default(GOVT)
+  syncStatus         SyncStatus       @default(PENDING)
+  lastSyncedAt       DateTime?
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+
+  scoreSnapshot     AreaScoreSnapshot?
+  categoryScores    AreaCategoryScore[]
+  history           AreaHistory[]
+  statistics        AreaStatistic[]
+  nearbyAmenities   AreaNearbyAmenity[]
+  insights          AreaInsight[]
+  propertyStats     PropertyStatistics?
+  priceHistory      PriceHistory[]
+  builderRatings    BuilderRating[]
+  savedBy           SavedArea[]
+  sourceConfidences SourceConfidence[]
+  jobLogs           BackgroundJobLog[]
+
+  @@index([syncStatus])
+}
+
+/// Current live score, one row per area, upserted on recompute.
+model AreaScoreSnapshot {
+  id           String     @id @default(cuid())
+  areaId       String     @unique
+  area         AreaMaster @relation(fields: [areaId], references: [id], onDelete: Cascade)
+  /// null = "insufficient data", never a fabricated default.
+  overallScore Float?
+  confidence   Float?
+  algoVersion  String
+  computedAt   DateTime
+
+  @@index([computedAt])
+}
+
+/// Child rows, one per category per area — the category-level scoring detail
+/// behind an AreaScoreSnapshot.
+model AreaCategoryScore {
+  id         String            @id @default(cuid())
+  areaId     String
+  area       AreaMaster        @relation(fields: [areaId], references: [id], onDelete: Cascade)
+  category   AreaScoreCategory
+  score      Float?
+  confidence Float?
+  /// Weight actually used in the overall-score rollup for THIS computation
+  /// (post-redistribution — see AreaScoringEngine).
+  weight     Float
+  /// Which raw inputs/sources contributed, for auditability.
+  inputsUsed Json
+  computedAt DateTime
+
+  @@unique([areaId, category])
+  @@index([areaId])
+}
+
+/// Append-only trend snapshots (nightly), cheap denormalized blob for trend
+/// charts. Pruned by the monthly History Cleanup job.
+model AreaHistory {
+  id             String     @id @default(cuid())
+  areaId         String
+  area           AreaMaster @relation(fields: [areaId], references: [id], onDelete: Cascade)
+  snapshotAt     DateTime
+  overallScore   Float?
+  /// { SAFETY: 8.1, TRAFFIC: 6.4, ... }
+  categoryScores Json
+  /// Key stats at the time, for trend charts.
+  statsSnapshot  Json
+  createdAt      DateTime   @default(now())
+
+  @@index([areaId, snapshotAt])
+}
+
+/// Flexible key/value+JSON stat rows (mirrors `Listing.data`) — new stat types
+/// (walkability, AQI, noise, rental demand, ...) need zero migrations.
+model AreaStatistic {
+  id        String     @id @default(cuid())
+  areaId    String
+  area      AreaMaster @relation(fields: [areaId], references: [id], onDelete: Cascade)
+  statKey   String
+  value     Float?
+  unit      String?
+  source    String
+  asOfDate  DateTime
+  createdAt DateTime   @default(now())
+
+  @@unique([areaId, statKey, asOfDate])
+  @@index([areaId])
+}
+
+/// Standalone POI table — reused across areas, not duplicated per area.
+/// Deduped by `externalPlaceId` (the provider's Google Place ID / OSM id).
+model NearbyAmenity {
+  id              String          @id @default(cuid())
+  category        AmenityCategory
+  name            String
+  latitude        Float
+  longitude       Float
+  externalPlaceId String?         @unique
+  source          String
+  rating          Float?
+  lastSyncedAt    DateTime
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  areas AreaNearbyAmenity[]
+
+  @@index([category])
+}
+
+/// Join: which amenities are near which area, computed by the collector job.
+model AreaNearbyAmenity {
+  areaId         String
+  area           AreaMaster    @relation(fields: [areaId], references: [id], onDelete: Cascade)
+  amenityId      String
+  amenity        NearbyAmenity @relation(fields: [amenityId], references: [id], onDelete: Cascade)
+  distanceMeters Int
+  walkTimeMin    Int?
+  computedAt     DateTime      @default(now())
+
+  @@id([areaId, amenityId])
+  @@index([areaId])
+  @@index([amenityId])
+}
+
+/// AI-generated summary/pros/cons/recommendations, versioned so summaries can
+/// be regenerated without losing audit history. Downstream of the numeric
+/// scores — never a second source of truth for them.
+model AreaInsight {
+  id              String     @id @default(cuid())
+  areaId          String
+  area            AreaMaster @relation(fields: [areaId], references: [id], onDelete: Cascade)
+  summary         String
+  pros            String[]
+  cons            String[]
+  recommendations String[]
+  confidence      Float?
+  modelVersion    String
+  promptVersion   String
+  generatedAt     DateTime
+  isCurrent       Boolean    @default(true)
+
+  @@index([areaId, isCurrent])
+}
+
+/// ---- Property-adjacent (stub until a Property module exists) ----
+/// Never owner-writable — only ever written by background jobs/admin recompute.
+/// Keys on areaId + free-text (builderName) until a real Property/Builder
+/// module ships; gets upgraded to a hard FK then.
+
+model PropertyStatistics {
+  id           String     @id @default(cuid())
+  areaId       String     @unique
+  area         AreaMaster @relation(fields: [areaId], references: [id], onDelete: Cascade)
+  avgPrice     Float?
+  pricePerSqft Float?
+  listingCount Int        @default(0)
+  demandIndex  Float?
+  computedAt   DateTime
+}
+
+model PriceHistory {
+  id           String     @id @default(cuid())
+  areaId       String
+  area         AreaMaster @relation(fields: [areaId], references: [id], onDelete: Cascade)
+  /// Month granularity.
+  period       DateTime
+  avgPrice     Float
+  pricePerSqft Float?
+  sampleSize   Int
+
+  @@unique([areaId, period])
+}
+
+model BuilderRating {
+  id          String     @id @default(cuid())
+  areaId      String
+  area        AreaMaster @relation(fields: [areaId], references: [id], onDelete: Cascade)
+  builderName String
+  rating      Float?
+  reviewCount Int        @default(0)
+  source      String
+
+  @@index([areaId, builderName])
+}
+
+/// A user's saved/bookmarked area.
+model SavedArea {
+  userId    String
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  areaId    String
+  area      AreaMaster @relation(fields: [areaId], references: [id], onDelete: Cascade)
+  createdAt DateTime   @default(now())
+
+  @@id([userId, areaId])
+}
+
+/// DB-backed provider registry so admins can toggle providers without
+/// redeploying. `providerKey` matches the provider's `.name` in code (e.g.
+/// "govt-crime"), mirroring LocationDataProvider's `name` field.
+model ExternalDataSource {
+  id              String             @id @default(cuid())
+  providerKey     String             @unique
+  category        DataSourceCategory
+  displayName     String
+  isActive        Boolean            @default(true)
+  /// Fallback order within a category — lower runs first.
+  priority        Int                @default(0)
+  rateLimitPerMin Int?
+  lastSuccessAt   DateTime?
+  lastFailureAt   DateTime?
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+
+  confidences SourceConfidence[]
+
+  @@index([category])
+}
+
+/// Per area+category+source confidence, feeding the Scoring Engine's
+/// confidence calc (freshness + sample size).
+model SourceConfidence {
+  areaId          String
+  area            AreaMaster         @relation(fields: [areaId], references: [id], onDelete: Cascade)
+  category        AreaScoreCategory
+  sourceId        String
+  source          ExternalDataSource @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  confidenceScore Float
+  sampleSize      Int?
+  lastVerifiedAt  DateTime
+
+  @@id([areaId, category, sourceId])
+}
+
+/// Merges DataSyncLog + AreaRefreshLog + generic job audit into one table,
+/// distinguished by `jobType`. `areaId = null` means a bulk/global run.
+model BackgroundJobLog {
+  id               String            @id @default(cuid())
+  jobType          BackgroundJobType
+  areaId           String?
+  area             AreaMaster?       @relation(fields: [areaId], references: [id], onDelete: SetNull)
+  status           JobStatus
+  recordsProcessed Int?
+  errorMessage     String?
+  triggeredById    String?
+  triggeredBy      User?             @relation("BackgroundJobTriggeredBy", fields: [triggeredById], references: [id], onDelete: SetNull)
+  startedAt        DateTime
+  finishedAt       DateTime?
+
+  @@index([jobType, startedAt])
+  @@index([areaId])
 }

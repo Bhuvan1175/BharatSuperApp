@@ -93,7 +93,9 @@ const LevelBlock: React.FC<{
   }, [items, query]);
 
   const submitAdd = () => {
-    if (!name.trim()) return;
+    if (!name.trim()) {
+      return;
+    }
     onAdd(name.trim());
     setName('');
   };
@@ -142,7 +144,9 @@ const LevelBlock: React.FC<{
                   }}>
                   <AppText
                     variant="label"
-                    color={active ? theme.colors.textInverse : theme.colors.text}>
+                    color={
+                      active ? theme.colors.textInverse : theme.colors.text
+                    }>
                     {i.name}
                   </AppText>
                 </Pressable>
@@ -150,7 +154,10 @@ const LevelBlock: React.FC<{
             })}
           </View>
         ) : (
-          <AppText variant="caption" muted style={{marginBottom: theme.spacing.md}}>
+          <AppText
+            variant="caption"
+            muted
+            style={{marginBottom: theme.spacing.md}}>
             {query ? 'No matches.' : 'None yet — add below.'}
           </AppText>
         ))}
@@ -175,7 +182,10 @@ const LevelBlock: React.FC<{
             </Card>
           ))
         ) : (
-          <AppText variant="caption" muted style={{marginBottom: theme.spacing.md}}>
+          <AppText
+            variant="caption"
+            muted
+            style={{marginBottom: theme.spacing.md}}>
             {query ? 'No matches.' : 'None yet — add below.'}
           </AppText>
         ))}
@@ -223,10 +233,214 @@ const LevelBlock: React.FC<{
       )}
       {!!suggestions?.length && (
         <Card style={{marginTop: theme.spacing.sm}}>
-          <AppText variant="label" muted style={{marginBottom: theme.spacing.sm}}>
+          <AppText
+            variant="label"
+            muted
+            style={{marginBottom: theme.spacing.sm}}>
             Suggestions — review, then save
           </AppText>
-          <View style={{flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.sm}}>
+          <View
+            style={{
+              flexDirection: 'row',
+              flexWrap: 'wrap',
+              gap: theme.spacing.sm,
+            }}>
+            {suggestions.map(s => (
+              <View
+                key={s}
+                style={{
+                  paddingHorizontal: theme.spacing.md,
+                  paddingVertical: theme.spacing.sm,
+                  borderRadius: theme.radius.pill,
+                  backgroundColor: theme.colors.cardAlt,
+                  borderWidth: 1,
+                  borderColor: theme.colors.border,
+                }}>
+                <AppText variant="label">{s}</AppText>
+              </View>
+            ))}
+          </View>
+          <Button
+            label={`Save all (${suggestions.length})`}
+            icon="check"
+            size="sm"
+            onPress={onSaveSuggestions}
+            loading={savingSuggestions}
+            disabled={savingSuggestions}
+            style={{marginTop: theme.spacing.md}}
+          />
+        </Card>
+      )}
+    </View>
+  );
+};
+
+/**
+ * Locality level (PIN code + Area name). Unlike the other cascade levels this
+ * needs two inputs: the PIN code is what lets the backend best-effort resolve
+ * real coordinates (data.gov.in's pincode directory carries lat/long), which is
+ * what nearby-amenity collection needs later — a name alone can't be geocoded.
+ * Existing rows show whether that lookup has resolved yet.
+ */
+const LocalityBlock: React.FC<{
+  items: (Item & {
+    pincode?: string | null;
+    latitude?: number | null;
+    longitude?: number | null;
+  })[];
+  onDelete: (item: Item) => void;
+  onAdd: (args: {name: string; pincode: string}) => void;
+  adding?: boolean;
+  aiEnabled?: boolean;
+  onSuggest?: () => void;
+  suggesting?: boolean;
+  suggestions?: string[];
+  onSaveSuggestions?: () => void;
+  savingSuggestions?: boolean;
+  note?: string;
+}> = ({
+  items,
+  onDelete,
+  onAdd,
+  adding,
+  aiEnabled,
+  onSuggest,
+  suggesting,
+  suggestions,
+  onSaveSuggestions,
+  savingSuggestions,
+  note,
+}) => {
+  const {theme} = useTheme();
+  const [pincode, setPincode] = useState('');
+  const [name, setName] = useState('');
+
+  const pincodeValid = /^\d{6}$/.test(pincode.trim());
+  const canSubmit = pincodeValid && !!name.trim();
+
+  const submit = () => {
+    if (!canSubmit) {
+      return;
+    }
+    onAdd({name: name.trim(), pincode: pincode.trim()});
+    setPincode('');
+    setName('');
+  };
+
+  return (
+    <View style={{marginTop: theme.spacing.md}}>
+      <SectionHeader title="Areas / localities" />
+
+      {items.length ? (
+        items.map(i => (
+          <Card
+            key={i.id}
+            style={{
+              marginBottom: theme.spacing.sm,
+              flexDirection: 'row',
+              alignItems: 'center',
+            }}>
+            <View style={{flex: 1}}>
+              <AppText variant="body" numberOfLines={1}>
+                {i.name}
+              </AppText>
+              <AppText variant="caption" muted numberOfLines={1}>
+                {i.pincode ? `PIN ${i.pincode} · ` : 'No PIN code · '}
+                {i.latitude != null && i.longitude != null
+                  ? 'Located'
+                  : i.pincode
+                  ? 'Locating…'
+                  : 'Not located — nearby data won’t collect'}
+              </AppText>
+            </View>
+            <Pressable hitSlop={8} onPress={() => onDelete(i)}>
+              <Icon name="trash-2" size={18} color={theme.colors.danger} />
+            </Pressable>
+          </Card>
+        ))
+      ) : (
+        <AppText
+          variant="caption"
+          muted
+          style={{marginBottom: theme.spacing.md}}>
+          None yet — add one below with its PIN code.
+        </AppText>
+      )}
+
+      {/* Add one: PIN code first (drives geocoding), then the area name */}
+      <View style={{gap: theme.spacing.sm}}>
+        <Input
+          value={pincode}
+          onChangeText={t => setPincode(t.replace(/\D/g, '').slice(0, 6))}
+          placeholder="PIN code (6 digits)"
+          keyboardType="number-pad"
+          maxLength={6}
+        />
+        <View
+          style={{
+            flexDirection: 'row',
+            gap: theme.spacing.sm,
+            alignItems: 'flex-end',
+          }}>
+          <Input
+            value={name}
+            onChangeText={setName}
+            placeholder="Area name (e.g. Gandhi Nagar)"
+            containerStyle={{flex: 1}}
+          />
+          <Button
+            label="Add"
+            size="sm"
+            fullWidth={false}
+            onPress={submit}
+            loading={adding}
+            disabled={adding || !canSubmit}
+          />
+        </View>
+        {!!pincode && !pincodeValid && (
+          <AppText variant="caption" color={theme.colors.danger}>
+            PIN code must be exactly 6 digits.
+          </AppText>
+        )}
+      </View>
+
+      {aiEnabled && !!onSuggest && (
+        <Button
+          label={suggesting ? 'Fetching…' : 'Suggest names with AI'}
+          icon="zap"
+          variant="outline"
+          size="sm"
+          onPress={onSuggest}
+          loading={suggesting}
+          disabled={suggesting}
+          style={{marginTop: theme.spacing.sm}}
+        />
+      )}
+      {aiEnabled && (
+        <AppText variant="caption" muted style={{marginTop: theme.spacing.xs}}>
+          AI can suggest area names, but not PIN codes — add those manually per
+          area so the coordinate lookup works.
+        </AppText>
+      )}
+      {!!note && (
+        <AppText variant="caption" muted style={{marginTop: theme.spacing.sm}}>
+          {note}
+        </AppText>
+      )}
+      {!!suggestions?.length && (
+        <Card style={{marginTop: theme.spacing.sm}}>
+          <AppText
+            variant="label"
+            muted
+            style={{marginBottom: theme.spacing.sm}}>
+            Suggestions — review, then save (add PIN codes afterwards)
+          </AppText>
+          <View
+            style={{
+              flexDirection: 'row',
+              flexWrap: 'wrap',
+              gap: theme.spacing.sm,
+            }}>
             {suggestions.map(s => (
               <View
                 key={s}
@@ -275,7 +489,9 @@ const WardBlock: React.FC<{cityId: string; wardsAuto: boolean}> = ({
   const [name, setName] = useState('');
 
   const submit = () => {
-    if (!number.trim() || !name.trim()) return;
+    if (!number.trim() || !name.trim()) {
+      return;
+    }
     createWard.mutate(
       {number: number.trim(), name: name.trim()},
       {
@@ -293,7 +509,10 @@ const WardBlock: React.FC<{cityId: string; wardsAuto: boolean}> = ({
       <SectionHeader title="Wards (number + name)" />
 
       {isLoading ? (
-        <AppText variant="caption" muted style={{marginBottom: theme.spacing.sm}}>
+        <AppText
+          variant="caption"
+          muted
+          style={{marginBottom: theme.spacing.sm}}>
           Fetching wards…
         </AppText>
       ) : wards && wards.length ? (
@@ -311,21 +530,28 @@ const WardBlock: React.FC<{cityId: string; wardsAuto: boolean}> = ({
             <Pressable
               hitSlop={8}
               onPress={() =>
-                Alert.alert('Delete ward?', `Remove "Ward ${w.number} — ${w.name}"?`, [
-                  {text: 'Cancel', style: 'cancel'},
-                  {
-                    text: 'Delete',
-                    style: 'destructive',
-                    onPress: () => deleteWard.mutate(w.id, {onError: fail}),
-                  },
-                ])
+                Alert.alert(
+                  'Delete ward?',
+                  `Remove "Ward ${w.number} — ${w.name}"?`,
+                  [
+                    {text: 'Cancel', style: 'cancel'},
+                    {
+                      text: 'Delete',
+                      style: 'destructive',
+                      onPress: () => deleteWard.mutate(w.id, {onError: fail}),
+                    },
+                  ],
+                )
               }>
               <Icon name="trash-2" size={18} color={theme.colors.danger} />
             </Pressable>
           </Card>
         ))
       ) : (
-        <AppText variant="caption" muted style={{marginBottom: theme.spacing.sm}}>
+        <AppText
+          variant="caption"
+          muted
+          style={{marginBottom: theme.spacing.sm}}>
           {wardsAuto
             ? 'No wards found automatically — add one below or re-fetch.'
             : 'No wards yet — add each ward’s number + name below.'}
@@ -363,7 +589,9 @@ const WardBlock: React.FC<{cityId: string; wardsAuto: boolean}> = ({
 
       {wardsAuto && (
         <Button
-          label={refetchWards.isPending ? 'Fetching…' : 'Re-fetch wards with AI'}
+          label={
+            refetchWards.isPending ? 'Fetching…' : 'Re-fetch wards with AI'
+          }
           icon="refresh-cw"
           variant="outline"
           size="sm"
@@ -427,8 +655,8 @@ const ManageLocalitiesScreen: React.FC = () => {
 
       {aiEnabled && (
         <AppText variant="caption" muted style={{marginTop: theme.spacing.sm}}>
-          Auto-fill is on ({aiStatus?.provider}). Villages fill in when you add a
-          district.{' '}
+          Auto-fill is on ({aiStatus?.provider}). Villages fill in when you add
+          a district.{' '}
           {wardsAuto
             ? 'Wards fill in when you open a village.'
             : 'Add each village’s wards (number + name) below.'}{' '}
@@ -451,7 +679,10 @@ const ManageLocalitiesScreen: React.FC = () => {
         }}
         addPlaceholder="Add a state (e.g. Maharashtra)"
         onAdd={name =>
-          createState.mutate(name, {onSuccess: s => setStateId(s.id), onError: fail})
+          createState.mutate(name, {
+            onSuccess: s => setStateId(s.id),
+            onError: fail,
+          })
         }
         adding={createState.isPending}
       />
@@ -491,7 +722,9 @@ const ManageLocalitiesScreen: React.FC = () => {
             suggestDistricts.mutate(stateId, {
               onSuccess: r => {
                 setDistSug(r.suggestions);
-                if (!r.suggestions.length) setDistNote(r.message);
+                if (!r.suggestions.length) {
+                  setDistNote(r.message);
+                }
               },
               onError: fail,
             });
@@ -521,7 +754,10 @@ const ManageLocalitiesScreen: React.FC = () => {
           }}
           addPlaceholder="Add a city / village (e.g. Kalmeshwar)"
           onAdd={name =>
-            createCity.mutate(name, {onSuccess: c => setCityId(c.id), onError: fail})
+            createCity.mutate(name, {
+              onSuccess: c => setCityId(c.id),
+              onError: fail,
+            })
           }
           adding={createCity.isPending}
           aiEnabled={aiEnabled}
@@ -531,7 +767,9 @@ const ManageLocalitiesScreen: React.FC = () => {
             suggestCities.mutate(districtId, {
               onSuccess: r => {
                 setCitySug(r.suggestions);
-                if (!r.suggestions.length) setCityNote(r.message);
+                if (!r.suggestions.length) {
+                  setCityNote(r.message);
+                }
               },
               onError: fail,
             });
@@ -552,7 +790,11 @@ const ManageLocalitiesScreen: React.FC = () => {
       {/* Re-fetch villages for the selected district (auto-fill top-up). */}
       {!!districtId && aiEnabled && (
         <Button
-          label={refetchCities.isPending ? 'Fetching villages…' : 'Re-fetch villages with AI'}
+          label={
+            refetchCities.isPending
+              ? 'Fetching villages…'
+              : 'Re-fetch villages with AI'
+          }
           icon="refresh-cw"
           variant="outline"
           size="sm"
@@ -571,10 +813,9 @@ const ManageLocalitiesScreen: React.FC = () => {
       {/* WARDS (auto-populated) */}
       {!!cityId && <WardBlock cityId={cityId} wardsAuto={wardsAuto} />}
 
-      {/* LOCALITY (optional free-text areas) */}
+      {/* LOCALITY (PIN code + area name — PIN drives coordinate lookup) */}
       {!!cityId && (
-        <LevelBlock
-          title="Areas / localities (optional)"
+        <LocalityBlock
           items={localities ?? []}
           onDelete={item =>
             Alert.alert('Delete area?', `Remove "${item.name}"?`, [
@@ -582,15 +823,11 @@ const ManageLocalitiesScreen: React.FC = () => {
               {
                 text: 'Delete',
                 style: 'destructive',
-                onPress: () =>
-                  deleteLocality.mutate(item.id, {onError: fail}),
+                onPress: () => deleteLocality.mutate(item.id, {onError: fail}),
               },
             ])
           }
-          addPlaceholder="Add an area (e.g. Gandhi Nagar)"
-          onAdd={name =>
-            createLocality.mutate(name, {onError: fail})
-          }
+          onAdd={args => createLocality.mutate(args, {onError: fail})}
           adding={createLocality.isPending}
           aiEnabled={aiEnabled}
           onSuggest={() => {
@@ -599,7 +836,9 @@ const ManageLocalitiesScreen: React.FC = () => {
             suggestLocalities.mutate(cityId, {
               onSuccess: r => {
                 setLocSug(r.suggestions);
-                if (!r.suggestions.length) setLocNote(r.message);
+                if (!r.suggestions.length) {
+                  setLocNote(r.message);
+                }
               },
               onError: fail,
             });

@@ -1,5 +1,8 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { ScheduleModule } from '@nestjs/schedule';
+import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
+import { APP_GUARD } from '@nestjs/core';
 
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
@@ -16,12 +19,20 @@ import { LocationModule } from './location/location.module';
 import { ListingModule } from './listing/listing.module';
 import { MedicineModule } from './modules/medicine/medicine.module';
 import { WaterModule } from './modules/water/water.module';
+import { AreaIntelligenceModule } from './modules/area-intelligence/area-intelligence.module';
+import { HealthModule } from './health/health.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
     }),
+    // Global default rate limit (generous — 100 req / 60s per IP). Individual
+    // routes (e.g. Area Intelligence admin sync/refresh/recalculate) can
+    // override with a stricter @Throttle(...).
+    ThrottlerModule.forRoot([{ ttl: 60_000, limit: 100 }]),
+    // Cron triggers for background jobs (Area Intelligence schedulers).
+    ScheduleModule.forRoot(),
     PrismaModule,
     AuthModule,
     UsersModule,
@@ -36,8 +47,10 @@ import { WaterModule } from './modules/water/water.module';
     // Example module APIs demonstrating role-gated authorization.
     MedicineModule,
     WaterModule,
+    AreaIntelligenceModule,
+    HealthModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [AppService, { provide: APP_GUARD, useClass: ThrottlerGuard }],
 })
 export class AppModule {}

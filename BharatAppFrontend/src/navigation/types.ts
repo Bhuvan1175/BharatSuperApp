@@ -24,6 +24,10 @@ export type RootStackParamList = {
   Emergency: undefined;
   Utilities: undefined;
   AreaScore: {areaId?: string; query?: string} | undefined;
+  // ---- Area Intelligence (real backend-integrated) ----
+  AreaCompare: {areaIds?: string[]} | undefined;
+  AreaAdminJobs: undefined;
+  AreaDataSources: undefined;
   RoadTrip: undefined;
   Eligibility: undefined;
   SchemeResults: {category?: string} | undefined;
@@ -58,6 +62,4 @@ export type RootStackParamList = {
 };
 
 /** Deep-link targets emitted by AI actions / quick actions. */
-export type DeepLinkTarget =
-  | keyof RootStackParamList
-  | keyof MainTabParamList;
+export type DeepLinkTarget = keyof RootStackParamList | keyof MainTabParamList;

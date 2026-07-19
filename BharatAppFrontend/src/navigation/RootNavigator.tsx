@@ -1,6 +1,10 @@
 import React, {useEffect} from 'react';
 import {View, ActivityIndicator} from 'react-native';
-import {NavigationContainer, DefaultTheme, DarkTheme} from '@react-navigation/native';
+import {
+  NavigationContainer,
+  DefaultTheme,
+  DarkTheme,
+} from '@react-navigation/native';
 import {createNativeStackNavigator} from '@react-navigation/native-stack';
 
 import {RootStackParamList} from './types';
@@ -57,6 +61,11 @@ import {
   StoreLocationScreen,
 } from '../screens/medicine';
 import MedicineRemindersScreen from '../screens/health/MedicineRemindersScreen';
+import {
+  AreaCompareScreen,
+  AreaAdminJobsScreen,
+  AreaDataSourcesScreen,
+} from '../screens/area';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -89,7 +98,13 @@ const RootNavigator: React.FC = () => {
   // Splash while we check onboarding + restore the session.
   if (initializing || isBootstrapping) {
     return (
-      <View style={{flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.colors.background}}>
+      <View
+        style={{
+          flex: 1,
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor: theme.colors.background,
+        }}>
         <ActivityIndicator color={theme.colors.primary} size="large" />
       </View>
     );
@@ -98,11 +113,17 @@ const RootNavigator: React.FC = () => {
   return (
     <NavigationContainer ref={navigationRef} theme={navTheme}>
       <Stack.Navigator
-        screenOptions={{headerShown: false, animation: 'slide_from_right', contentStyle: {backgroundColor: theme.colors.background}}}>
+        screenOptions={{
+          headerShown: false,
+          animation: 'slide_from_right',
+          contentStyle: {backgroundColor: theme.colors.background},
+        }}>
         {!isAuthenticated ? (
           // ---- Unauthenticated flow ----
           <Stack.Group>
-            {!onboarded && <Stack.Screen name="Onboarding" component={OnboardingScreen} />}
+            {!onboarded && (
+              <Stack.Screen name="Onboarding" component={OnboardingScreen} />
+            )}
             <Stack.Screen name="Login" component={LoginScreen} />
             <Stack.Screen name="Otp" component={OtpScreen} />
           </Stack.Group>
@@ -115,38 +136,87 @@ const RootNavigator: React.FC = () => {
             <Stack.Screen name="Main" component={RoleRouter} />
             <Stack.Screen name="Permissions" component={PermissionsScreen} />
             <Stack.Screen name="Biometric" component={BiometricScreen} />
-            <Stack.Screen name="AIChat" component={AIChatScreen} options={{animation: 'slide_from_bottom'}} />
+            <Stack.Screen
+              name="AIChat"
+              component={AIChatScreen}
+              options={{animation: 'slide_from_bottom'}}
+            />
             <Stack.Screen name="Health" component={HealthScreen} />
-            <Stack.Screen name="PrescriptionScanner" component={PrescriptionScannerScreen} />
+            <Stack.Screen
+              name="PrescriptionScanner"
+              component={PrescriptionScannerScreen}
+            />
             <Stack.Screen name="Emergency" component={EmergencyScreen} />
             <Stack.Screen name="Utilities" component={UtilitiesScreen} />
             <Stack.Screen name="LocalAlerts" component={LocalAlertsScreen} />
             <Stack.Screen name="AreaScore" component={AreaScoreScreen} />
+            <Stack.Screen name="AreaCompare" component={AreaCompareScreen} />
+            <Stack.Screen
+              name="AreaAdminJobs"
+              component={AreaAdminJobsScreen}
+            />
+            <Stack.Screen
+              name="AreaDataSources"
+              component={AreaDataSourcesScreen}
+            />
             <Stack.Screen name="RoadTrip" component={RoadTripScreen} />
             <Stack.Screen name="Eligibility" component={EligibilityScreen} />
-            <Stack.Screen name="SchemeResults" component={SchemeResultsScreen} />
+            <Stack.Screen
+              name="SchemeResults"
+              component={SchemeResultsScreen}
+            />
             <Stack.Screen name="Settings" component={SettingsScreen} />
             <Stack.Screen name="Saved" component={SavedScreen} />
             <Stack.Screen name="EditProfile" component={EditProfileScreen} />
             <Stack.Screen name="UserSearch" component={UserSearchScreen} />
             <Stack.Screen name="Account" component={AccountScreen} />
-            <Stack.Screen name="AdminDepartmentUsers" component={DepartmentUsersScreen} />
+            <Stack.Screen
+              name="AdminDepartmentUsers"
+              component={DepartmentUsersScreen}
+            />
             <Stack.Screen name="AdminAddUser" component={AddUserScreen} />
             <Stack.Screen name="AdminEditUser" component={EditUserScreen} />
-            <Stack.Screen name="AdminDepartments" component={DepartmentsScreen} />
-            <Stack.Screen name="AdminAddDepartment" component={AddDepartmentScreen} />
-            <Stack.Screen name="AdminEditDepartment" component={EditDepartmentScreen} />
+            <Stack.Screen
+              name="AdminDepartments"
+              component={DepartmentsScreen}
+            />
+            <Stack.Screen
+              name="AdminAddDepartment"
+              component={AddDepartmentScreen}
+            />
+            <Stack.Screen
+              name="AdminEditDepartment"
+              component={EditDepartmentScreen}
+            />
             <Stack.Screen name="AdminRoles" component={RolesScreen} />
             <Stack.Screen name="AdminAddRole" component={AddRoleScreen} />
             <Stack.Screen name="DeptAddListing" component={AddListingScreen} />
-            <Stack.Screen name="DeptManageEntries" component={ManageEntriesScreen} />
+            <Stack.Screen
+              name="DeptManageEntries"
+              component={ManageEntriesScreen}
+            />
             <Stack.Screen name="DeptReports" component={ReportsScreen} />
-            <Stack.Screen name="DeptLocalities" component={ManageLocalitiesScreen} />
-            <Stack.Screen name="MedicineInventory" component={MedicineInventoryScreen} />
+            <Stack.Screen
+              name="DeptLocalities"
+              component={ManageLocalitiesScreen}
+            />
+            <Stack.Screen
+              name="MedicineInventory"
+              component={MedicineInventoryScreen}
+            />
             <Stack.Screen name="AddMedicine" component={AddMedicineScreen} />
-            <Stack.Screen name="MedicineRequests" component={MedicineRequestsScreen} />
-            <Stack.Screen name="StoreLocation" component={StoreLocationScreen} />
-            <Stack.Screen name="MedicineReminders" component={MedicineRemindersScreen} />
+            <Stack.Screen
+              name="MedicineRequests"
+              component={MedicineRequestsScreen}
+            />
+            <Stack.Screen
+              name="StoreLocation"
+              component={StoreLocationScreen}
+            />
+            <Stack.Screen
+              name="MedicineReminders"
+              component={MedicineRemindersScreen}
+            />
           </Stack.Group>
         )}
       </Stack.Navigator>

@@ -74,4 +74,18 @@ export class LocationDataService {
     }
     return [];
   }
+
+  /**
+   * Resolve a PIN code to coordinates via the government pincode directory.
+   * Govt-only — OpenAI has no equivalent lookup — so this bypasses the
+   * provider-preference ordering used for villages/wards. The locality/city
+   * name (when given) disambiguates a PIN code that covers several post
+   * offices with different coordinates.
+   */
+  geocodePincode(
+    pincode: string,
+    context?: { localityName?: string; cityName?: string },
+  ): Promise<{ latitude: number; longitude: number } | null> {
+    return this.govt.fetchCoordinatesByPincode(pincode, context);
+  }
 }
