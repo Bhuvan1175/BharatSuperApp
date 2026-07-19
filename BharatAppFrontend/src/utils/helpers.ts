@@ -19,7 +19,9 @@ export const crowdColor = (level: CrowdLevel): string => {
   }
 };
 
-export const crowdLabelKey = (level: CrowdLevel): 'crowdLow' | 'crowdMedium' | 'crowdHigh' => {
+export const crowdLabelKey = (
+  level: CrowdLevel,
+): 'crowdLow' | 'crowdMedium' | 'crowdHigh' => {
   switch (level) {
     case 'low':
       return 'crowdLow';
@@ -32,17 +34,31 @@ export const crowdLabelKey = (level: CrowdLevel): 'crowdLow' | 'crowdMedium' | '
 
 /** Colour for an area / category score on the 0-10 scale. */
 export const scoreColor = (score: number): string => {
-  if (score >= 8) return palette.emerald;
-  if (score >= 6) return palette.saffron;
-  if (score >= 4) return palette.amber;
+  if (score >= 8) {
+    return palette.emerald;
+  }
+  if (score >= 6) {
+    return palette.saffron;
+  }
+  if (score >= 4) {
+    return palette.amber;
+  }
   return palette.alertRed;
 };
 
 export const scoreLabel = (score: number): string => {
-  if (score >= 8.5) return 'Excellent';
-  if (score >= 7) return 'Very good';
-  if (score >= 5.5) return 'Good';
-  if (score >= 4) return 'Average';
+  if (score >= 8.5) {
+    return 'Excellent';
+  }
+  if (score >= 7) {
+    return 'Very good';
+  }
+  if (score >= 5.5) {
+    return 'Good';
+  }
+  if (score >= 4) {
+    return 'Average';
+  }
   return 'Below average';
 };
 
@@ -59,3 +75,39 @@ export const eligibilityColor = (status: EligibilityStatus): string => {
 
 export const wait = (ms: number): Promise<void> =>
   new Promise(res => setTimeout(res, ms));
+
+/** "AREA_MASTER_SYNC" -> "Area Master Sync" — background job type labels. */
+export const formatJobType = (jobType: string): string =>
+  jobType
+    .toLowerCase()
+    .split('_')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
+
+/** % change between the last two monthly price-history points, or null if too few. */
+export const computePriceGrowthPct = (
+  history: {avgPrice: number}[],
+): number | null => {
+  if (history.length < 2) {
+    return null;
+  }
+  const prev = history[history.length - 2].avgPrice;
+  const latest = history[history.length - 1].avgPrice;
+  if (!prev) {
+    return null;
+  }
+  return ((latest - prev) / prev) * 100;
+};
+
+/** Average of the non-null builder ratings for an area, or null if none. */
+export const averageBuilderRating = (
+  ratings: {rating: number | null}[],
+): number | null => {
+  const valid = ratings
+    .map(r => r.rating)
+    .filter((r): r is number => r != null);
+  if (!valid.length) {
+    return null;
+  }
+  return valid.reduce((a, b) => a + b, 0) / valid.length;
+};

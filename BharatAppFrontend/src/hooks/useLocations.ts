@@ -194,9 +194,18 @@ export const useRefetchWards = (cityId: string) => {
 export const useCreateLocality = (cityId: string) => {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (name: string) => locationApi.createLocality(cityId, name),
-    onSuccess: () =>
-      qc.invalidateQueries({queryKey: LOCATION_KEYS.localities(cityId)}),
+    mutationFn: (args: {name: string; pincode?: string}) =>
+      locationApi.createLocality(cityId, args),
+    // The PIN code is geocoded in the background (data.gov.in lookup), so
+    // re-check the list a couple of times shortly after — same pattern as
+    // useCreateDistrict's village auto-fetch — for the resolved coordinates
+    // to show up without a manual refresh.
+    onSuccess: () => {
+      const bump = () =>
+        qc.invalidateQueries({queryKey: LOCATION_KEYS.localities(cityId)});
+      bump();
+      setTimeout(bump, 4000);
+    },
   });
 };
 
@@ -221,10 +230,16 @@ export const useDeleteLocality = (cityId?: string) => {
 /* ------------------------------- Suggest ------------------------------ */
 
 export const useSuggestDistricts = () =>
-  useMutation({mutationFn: (stateId: string) => locationApi.suggestDistricts(stateId)});
+  useMutation({
+    mutationFn: (stateId: string) => locationApi.suggestDistricts(stateId),
+  });
 
 export const useSuggestCities = () =>
-  useMutation({mutationFn: (districtId: string) => locationApi.suggestCities(districtId)});
+  useMutation({
+    mutationFn: (districtId: string) => locationApi.suggestCities(districtId),
+  });
 
 export const useSuggestLocalities = () =>
-  useMutation({mutationFn: (cityId: string) => locationApi.suggestLocalities(cityId)});
+  useMutation({
+    mutationFn: (cityId: string) => locationApi.suggestLocalities(cityId),
+  });

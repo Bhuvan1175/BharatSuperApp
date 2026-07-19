@@ -1,40 +1,52 @@
-import React, {useEffect, useState} from 'react';
+import React from 'react';
 import {ActivityIndicator, View} from 'react-native';
 import {NativeStackScreenProps} from '@react-navigation/native-stack';
 import {RootStackParamList} from '../../navigation/types';
 import {useTheme} from '../../context/ThemeContext';
 import {useTranslation} from '../../hooks/useTranslation';
-import {areaService} from '../../services/areaService';
-import {AREAS} from '../../data/areas';
-import {Area} from '../../types';
-import {Screen, Header} from '../../components/common';
+import {useAreaSearch} from '../../hooks/useAreaIntelligence';
+import {getApiErrorMessage} from '../../api/errors';
+import {Screen, Header, AppText, EmptyState} from '../../components/common';
 import AreaDetail from './AreaDetail';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'AreaScore'>;
 
+/** Pushed screen (e.g. deep-linked from AI chat): shows one area's real detail
+ * directly by id, or resolves it from a free-text query first. */
 const AreaScoreScreen: React.FC<Props> = ({navigation, route}) => {
   const {theme} = useTheme();
   const {t} = useTranslation();
-  const [area, setArea] = useState<Area | null>(null);
+  const {areaId, query} = route.params ?? {};
 
-  useEffect(() => {
-    const {areaId, query} = route.params ?? {};
-    if (areaId) {
-      setArea(AREAS.find(a => a.id === areaId) ?? AREAS[0]);
-    } else {
-      areaService.getScore(query ?? 'Baner').then(setArea);
-    }
-  }, [route.params]);
+  const search = useAreaSearch(!areaId && query ? {q: query} : undefined);
+  const resolvedAreaId = areaId ?? search.data?.[0]?.id ?? null;
 
   return (
     <Screen scroll padded>
       <Header title={t.explore.areaScore} onBack={() => navigation.goBack()} />
-      {area ? (
+      {resolvedAreaId ? (
         <View style={{marginTop: theme.spacing.md}}>
-          <AreaDetail area={area} />
+          <AreaDetail areaId={resolvedAreaId} />
         </View>
+      ) : search.isLoading ? (
+        <ActivityIndicator
+          color={theme.colors.primary}
+          style={{marginTop: theme.spacing.huge}}
+        />
+      ) : search.isError ? (
+        <AppText
+          variant="body"
+          muted
+          center
+          style={{marginTop: theme.spacing.huge}}>
+          {getApiErrorMessage(search.error)}
+        </AppText>
       ) : (
-        <ActivityIndicator color={theme.colors.primary} style={{marginTop: theme.spacing.huge}} />
+        <EmptyState
+          icon="search"
+          title="No area found"
+          subtitle={query ? `Nothing matched "${query}".` : undefined}
+        />
       )}
     </Screen>
   );

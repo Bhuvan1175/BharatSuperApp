@@ -27,9 +27,25 @@ const ScoreCircle: React.FC<ScoreCircleProps> = ({
   const color = scoreColor(score);
 
   return (
-    <View style={{width: size, height: size, alignItems: 'center', justifyContent: 'center'}}>
-      <Svg width={size} height={size} style={{position: 'absolute', transform: [{rotate: '-90deg'}]}}>
-        <Circle cx={size / 2} cy={size / 2} r={radius} stroke={theme.colors.cardAlt} strokeWidth={strokeWidth} fill="none" />
+    <View
+      style={{
+        width: size,
+        height: size,
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}>
+      <Svg
+        width={size}
+        height={size}
+        style={{position: 'absolute', transform: [{rotate: '-90deg'}]}}>
+        <Circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          stroke={theme.colors.cardAlt}
+          strokeWidth={strokeWidth}
+          fill="none"
+        />
         <Circle
           cx={size / 2}
           cy={size / 2}
@@ -41,11 +57,17 @@ const ScoreCircle: React.FC<ScoreCircleProps> = ({
           fill="none"
         />
       </Svg>
-      <AppText variant="h1" color={color} style={{fontSize: size * 0.3}}>
+      <AppText
+        variant="h1"
+        color={color}
+        style={{fontSize: size * 0.3, lineHeight: size * 0.35}}>
         {score.toFixed(1)}
       </AppText>
       {label && (
-        <AppText variant="caption" color={color} style={{fontWeight: '700', marginTop: 2}}>
+        <AppText
+          variant="caption"
+          color={color}
+          style={{fontWeight: '700', marginTop: 2}}>
           {label}
         </AppText>
       )}

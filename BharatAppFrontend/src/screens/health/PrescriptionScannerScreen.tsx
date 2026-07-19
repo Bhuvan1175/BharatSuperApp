@@ -1,5 +1,5 @@
 import React, {useState} from 'react';
-import {View, ActivityIndicator, Pressable, Alert, Image} from 'react-native';
+import {View, ActivityIndicator, Pressable, Alert, Image, PermissionsAndroid, Platform} from 'react-native';
 import {launchCamera, launchImageLibrary} from 'react-native-image-picker';
 import {NativeStackScreenProps} from '@react-navigation/native-stack';
 import {RootStackParamList} from '../../navigation/types';
@@ -59,11 +59,33 @@ const PrescriptionScannerScreen: React.FC<Props> = ({navigation}) => {
     }
   };
 
+  /** Android declares CAMERA in the manifest, so it's a dangerous permission the OS
+   * requires us to ask for at runtime; react-native-image-picker never prompts for
+   * it itself, it just fails with camera_unavailable if we skip this. */
+  const ensureCameraPermission = async (): Promise<boolean> => {
+    if (Platform.OS !== 'android') return true;
+    const already = await PermissionsAndroid.check(PermissionsAndroid.PERMISSIONS.CAMERA);
+    if (already) return true;
+    const granted = await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.CAMERA, {
+      title: 'Camera permission',
+      message: 'Allow camera access to scan your prescription.',
+      buttonPositive: 'Allow',
+      buttonNegative: 'Deny',
+    });
+    return granted === PermissionsAndroid.RESULTS.GRANTED;
+  };
+
   const takePhoto = async () => {
+    const hasPermission = await ensureCameraPermission();
+    if (!hasPermission) {
+      Alert.alert('Camera permission needed', 'Please allow camera access in your device settings to scan a prescription.');
+      return;
+    }
     const result = await launchCamera({mediaType: 'photo', quality: 0.85, saveToPhotos: false});
     if (result.didCancel) return;
     if (result.errorCode) {
-      Alert.alert('Camera unavailable', result.errorMessage ?? 'Please check camera permissions and try again.');
+      const title = result.errorCode === 'camera_unavailable' ? 'Camera unavailable' : 'Could not open camera';
+      Alert.alert(title, result.errorMessage ?? 'Please check camera permissions and try again.');
       return;
     }
     const uri = result.assets?.[0]?.uri;

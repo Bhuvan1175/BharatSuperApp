@@ -5,3 +5,4 @@ export {default as FuelStationCard} from './FuelStationCard';
 export {default as AlertCard} from './AlertCard';
 export {default as ModuleAlertCard} from './ModuleAlertCard';
 export {default as ComparisonCard} from './ComparisonCard';
+export {default as AreaIntelligenceCard} from './AreaIntelligenceCard';

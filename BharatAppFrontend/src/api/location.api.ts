@@ -28,6 +28,10 @@ export interface Locality {
   name: string;
   cityId: string;
   pincode?: string | null;
+  /** Best-effort resolved from the PIN code at creation time — null until
+   * the background geocode lookup finishes (or if it couldn't resolve). */
+  latitude?: number | null;
+  longitude?: number | null;
 }
 
 export interface Ward {
@@ -101,7 +105,8 @@ export const locationApi = {
       )
     ).data,
   deleteDistrict: async (id: string): Promise<MutationMessage> =>
-    (await apiClient.delete<MutationMessage>(`/locations/districts/${id}`)).data,
+    (await apiClient.delete<MutationMessage>(`/locations/districts/${id}`))
+      .data,
 
   /* Cities */
   listCities: async (districtId: string): Promise<City[]> =>
@@ -167,11 +172,15 @@ export const locationApi = {
   listLocalities: async (cityId: string): Promise<Locality[]> =>
     (await apiClient.get<Locality[]>(`/locations/cities/${cityId}/localities`))
       .data,
-  createLocality: async (cityId: string, name: string): Promise<Locality> =>
+  createLocality: async (
+    cityId: string,
+    args: {name: string; pincode?: string},
+  ): Promise<Locality> =>
     (
-      await apiClient.post<Locality>(`/locations/cities/${cityId}/localities`, {
-        name,
-      })
+      await apiClient.post<Locality>(
+        `/locations/cities/${cityId}/localities`,
+        args,
+      )
     ).data,
   bulkLocalities: async (
     cityId: string,
@@ -190,5 +199,6 @@ export const locationApi = {
       )
     ).data,
   deleteLocality: async (id: string): Promise<MutationMessage> =>
-    (await apiClient.delete<MutationMessage>(`/locations/localities/${id}`)).data,
+    (await apiClient.delete<MutationMessage>(`/locations/localities/${id}`))
+      .data,
 };

@@ -86,6 +86,76 @@ export class GovtLocationProvider implements LocationDataProvider {
   }
 
   /**
+   * Resolve a 6-digit PIN code to a representative lat/long, from the same
+   * pincode directory used for village auto-fill — it carries a `latitude` /
+   * `longitude` field per post office.
+   *
+   * One PIN code commonly covers many post offices (rural India especially),
+   * each with its OWN coordinates — sometimes hundreds of km apart, and
+   * occasionally outright bad data. So this doesn't just take the first
+   * plausible row: when a locality/city name is given, it prefers whichever
+   * post office's name actually matches, and only falls back to "first
+   * plausible" when nothing matches.
+   */
+  async fetchCoordinatesByPincode(
+    pincode: string,
+    context?: { localityName?: string; cityName?: string },
+  ): Promise<{ latitude: number; longitude: number } | null> {
+    if (!this.apiKey) return null;
+    const url =
+      `https://api.data.gov.in/resource/${this.resourceId}` +
+      `?api-key=${encodeURIComponent(this.apiKey)}` +
+      `&format=json&limit=20&filters[pincode]=${encodeURIComponent(pincode)}`;
+    const records = await this.getRecords(url);
+
+    const candidates = records
+      .map((r) => ({
+        place: this.cleanPlace(String(r[this.placeField] ?? '')),
+        latitude: Number(r.latitude),
+        longitude: Number(r.longitude),
+      }))
+      .filter((c) => this.isPlausibleIndianCoordinate(c.latitude, c.longitude));
+
+    if (!candidates.length) {
+      this.logger.warn(
+        `data.gov.in returned no usable coordinates for pincode ${pincode}`,
+      );
+      return null;
+    }
+
+    const wanted = [context?.localityName, context?.cityName]
+      .filter((s): s is string => !!s?.trim())
+      .map((s) => s.trim().toLowerCase());
+
+    for (const want of wanted) {
+      const exact = candidates.find((c) => c.place.toLowerCase() === want);
+      if (exact) return exact;
+    }
+    for (const want of wanted) {
+      const partial = candidates.find(
+        (c) =>
+          c.place.toLowerCase().includes(want) ||
+          want.includes(c.place.toLowerCase()),
+      );
+      if (partial) return partial;
+    }
+
+    return candidates[0];
+  }
+
+  /** Rejects 0/0 placeholder rows and anything outside India's rough bounding box. */
+  private isPlausibleIndianCoordinate(lat: number, lon: number): boolean {
+    return (
+      Number.isFinite(lat) &&
+      Number.isFinite(lon) &&
+      lat >= 6 &&
+      lat <= 38 &&
+      lon >= 68 &&
+      lon <= 98
+    );
+  }
+
+  /**
    * Page through the pincode directory filtered by a district field, collecting
    * distinct place (post-office) names. Prefers rows whose state also matches;
    * falls back to all district rows if the state spelling doesn't line up.

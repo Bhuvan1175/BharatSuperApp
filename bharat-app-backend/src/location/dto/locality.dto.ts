@@ -4,10 +4,17 @@ import {
   IsNotEmpty,
   IsOptional,
   IsString,
+  Matches,
   MaxLength,
 } from 'class-validator';
 
-/** Create a locality / area under a city, e.g. "Ward 3" or "Gandhi Nagar". */
+/**
+ * Create a locality / area under a city, e.g. "Ward 3" or "Gandhi Nagar".
+ * The PIN code is optional but strongly recommended: when present, the
+ * backend best-effort resolves it to real lat/long via the government
+ * pincode directory (data.gov.in), which is what nearby-amenity collection
+ * needs to run for this area later.
+ */
 export class CreateLocalityDto {
   @IsString()
   @IsNotEmpty()
@@ -16,7 +23,7 @@ export class CreateLocalityDto {
 
   @IsOptional()
   @IsString()
-  @MaxLength(10)
+  @Matches(/^\d{6}$/, { message: 'pincode must be exactly 6 digits' })
   pincode?: string;
 }
 

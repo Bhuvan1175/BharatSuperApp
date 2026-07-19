@@ -332,17 +332,24 @@ export class LocationService {
     this.assertManager(user);
     const city = await this.prisma.city.findUnique({ where: { id: cityId } });
     if (!city) throw new NotFoundException('City not found');
-    try {
-      return await this.prisma.locality.create({
-        data: {
-          cityId,
-          name: dto.name.trim(),
-          pincode: dto.pincode?.trim() || null,
-        },
-      });
-    } catch (e) {
-      this.conflict(e, 'locality');
+    const pincode = dto.pincode?.trim() || null;
+    const locality = await this.prisma.locality
+      .create({ data: { cityId, name: dto.name.trim(), pincode } })
+      .catch((e) => this.conflict(e, 'locality'));
+    // Fire-and-forget, same pattern as autoFetchCities: a PIN code lets us
+    // resolve real coordinates (data.gov.in's pincode directory carries
+    // lat/long), which is what unlocks nearby-amenity collection for this
+    // area later — but it shouldn't block the create response. The name is
+    // passed along too since one PIN code can cover several post offices.
+    if (pincode) {
+      void this.autoGeocodeLocality(
+        locality.id,
+        pincode,
+        dto.name.trim(),
+        city.name,
+      );
     }
+    return locality;
   }
 
   async bulkLocalities(user: AuthUser, cityId: string, dto: BulkNamesDto) {
@@ -444,6 +451,31 @@ export class LocationService {
         where: { id: city.id },
         data: { wardsFetched: true },
       });
+    } catch {
+      // Best-effort.
+    }
+  }
+
+  /** Resolve + save a locality's lat/long from its PIN code (+ name, to
+   * disambiguate a PIN code covering several post offices). Best-effort —
+   * never throws; the locality is already created and usable either way. */
+  private async autoGeocodeLocality(
+    localityId: string,
+    pincode: string,
+    localityName: string,
+    cityName: string,
+  ): Promise<void> {
+    try {
+      const coords = await this.locationData.geocodePincode(pincode, {
+        localityName,
+        cityName,
+      });
+      if (coords) {
+        await this.prisma.locality.update({
+          where: { id: localityId },
+          data: { latitude: coords.latitude, longitude: coords.longitude },
+        });
+      }
     } catch {
       // Best-effort.
     }

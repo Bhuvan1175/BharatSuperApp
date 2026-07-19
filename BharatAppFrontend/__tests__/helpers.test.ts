@@ -1,4 +1,11 @@
-import {crowdColor, scoreLabel, eligibilityColor} from '../src/utils/helpers';
+import {
+  crowdColor,
+  scoreLabel,
+  eligibilityColor,
+  formatJobType,
+  computePriceGrowthPct,
+  averageBuilderRating,
+} from '../src/utils/helpers';
 import {formatDistance, formatPrice, interpolate} from '../src/utils/format';
 
 describe('helpers', () => {
@@ -12,6 +19,26 @@ describe('helpers', () => {
   });
   it('colours eligibility', () => {
     expect(eligibilityColor('eligible')).toBe('#22C55E');
+  });
+  it('title-cases a background job type', () => {
+    expect(formatJobType('AREA_MASTER_SYNC')).toBe('Area Master Sync');
+    expect(formatJobType('SCORE_RECALC')).toBe('Score Recalc');
+  });
+  it('computes price growth % between the last two history points', () => {
+    expect(
+      computePriceGrowthPct([{avgPrice: 100}, {avgPrice: 110}]),
+    ).toBeCloseTo(10);
+    expect(
+      computePriceGrowthPct([{avgPrice: 100}, {avgPrice: 90}]),
+    ).toBeCloseTo(-10);
+    expect(computePriceGrowthPct([{avgPrice: 100}])).toBeNull();
+    expect(computePriceGrowthPct([])).toBeNull();
+  });
+  it('averages builder ratings, ignoring nulls', () => {
+    expect(averageBuilderRating([{rating: 4}, {rating: 5}])).toBe(4.5);
+    expect(averageBuilderRating([{rating: null}, {rating: 4}])).toBe(4);
+    expect(averageBuilderRating([{rating: null}])).toBeNull();
+    expect(averageBuilderRating([])).toBeNull();
   });
 });
 
