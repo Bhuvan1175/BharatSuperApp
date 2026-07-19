@@ -3,39 +3,26 @@ import {
   InternalServerErrorException,
   Logger,
 } from '@nestjs/common';
-import * as nodemailer from 'nodemailer';
-import type { Transporter } from 'nodemailer';
+import { Resend } from 'resend';
 
 /**
  * EmailService
  *
- * Reusable email layer built on Nodemailer + a Gmail App Password.
+ * Reusable email layer built on the Resend HTTP API. SMTP (Gmail) is not used
+ * because Render's free tier blocks outbound SMTP ports (465/587) — Resend
+ * uses plain HTTPS instead, which works from any host.
  * Credentials are read from environment variables only (never hardcoded):
- *   EMAIL_HOST, EMAIL_PORT, EMAIL_USER, EMAIL_PASS, EMAIL_FROM
+ *   RESEND_API_KEY, EMAIL_FROM
  *
  * Keep all email logic here — AuthService should only CALL this service.
  */
 @Injectable()
 export class EmailService {
   private readonly logger = new Logger(EmailService.name);
-  private readonly transporter: Transporter;
+  private readonly resend: Resend;
 
   constructor() {
-    const port = Number(process.env.EMAIL_PORT);
-
-    this.transporter = nodemailer.createTransport({
-      host: process.env.EMAIL_HOST,
-      port,
-      // Port 465 uses implicit TLS; 587 uses STARTTLS.
-      secure: port === 465,
-      auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS,
-      },
-      connectionTimeout: 10000,
-      greetingTimeout: 10000,
-      socketTimeout: 10000,
-    });
+    this.resend = new Resend(process.env.RESEND_API_KEY);
   }
 
   /**
@@ -44,14 +31,18 @@ export class EmailService {
    */
   async sendMail(to: string, subject: string, html: string): Promise<void> {
     try {
-      await this.transporter.sendMail({
-        from: process.env.EMAIL_FROM,
+      const { error } = await this.resend.emails.send({
+        from: process.env.EMAIL_FROM || 'onboarding@resend.dev',
         to,
         subject,
         html,
       });
+
+      if (error) {
+        throw new Error(error.message);
+      }
     } catch (error) {
-      // Do not leak SMTP internals to the client; log server-side and throw 500.
+      // Do not leak provider internals to the client; log server-side and throw 500.
       this.logger.error(`Failed to send email to ${to}`, error as Error);
       throw new InternalServerErrorException('Failed to send email');
     }
